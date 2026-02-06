@@ -1,0 +1,132 @@
+name: Create PR from Develop to Main with Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
+
+jobs:
+  create-release-pr:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout develop branch
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+
+      - name: Checkout main branch
+        run: |
+          git fetch origin main:main
+          git checkout main
+
+      - name: Identify version folders
+        id: versions
+        run: |
+          # Find all v* directories
+          VERSIONS=$(ls -d v*/ 2>/dev/null | sed 's#/##' || echo "")
+          echo "Found versions: $VERSIONS"
+          echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
+          
+          # Get the latest version for tagging
+          LATEST_VERSION=$(ls -d v*/ 2>/dev/null | sed 's#/##' | sort -V | tail -n1 || echo "v1")
+          echo "Latest version: $LATEST_VERSION"
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create version archives
+        run: |
+          mkdir -p releases
+          for version in ${{ steps.versions.outputs.versions }}; do
+            if [ -d "$version" ]; then
+              echo "Compressing $version..."
+              zip -r "releases/${version}.zip" "$version"
+              tar -czf "releases/${version}.tar.gz" "$version"
+            fi
+          done
+          ls -lh releases/
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Checkout develop for PR
+        run: git checkout develop
+
+      - name: Create Pull Request to Main
+        id: create_pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: develop
+          base: main
+          title: "Release: Merge develop into main (${{ steps.date.outputs.date }})"
+          body: |
+            ## 🚀 Release PR from Develop to Main
+            
+            This PR was automatically created after merging changes into develop.
+            
+            ### 📦 Versions Available
+            ${{ steps.versions.outputs.versions }}
+            
+            ### 📅 Release Date
+            ${{ steps.date.outputs.date }}
+            
+            ### ✅ Checklist
+            - [ ] All tests passing
+            - [ ] Documentation updated
+            - [ ] Version artifacts ready for release
+            
+            ### 📋 Changes
+            Please review all changes from develop branch.
+          labels: |
+            release
+            automated
+          draft: false
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          git checkout develop
+          echo "## Changelog" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          git log main..develop --pretty=format:"- %s (%h)" >> CHANGELOG.md
+          cat CHANGELOG.md
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.versions.outputs.latest_version }}-${{ steps.date.outputs.date }}
+          name: Release ${{ steps.versions.outputs.latest_version }} - ${{ steps.date.outputs.date }}
+          body: |
+            ## Release Notes
+            
+            Automated release created from develop branch.
+            
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### Available Versions
+            ${{ steps.versions.outputs.versions }}
+          files: |
+            releases/*.zip
+            releases/*.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest Version**: ${{ steps.versions.outputs.latest_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Tag**: ${{ steps.versions.outputs.latest_version }}-${{ steps.date.outputs.date }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Created**: Ready for review and merge to main" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifacts**: $(ls releases/ | wc -l) files compressed" >> $GITHUB_STEP_SUMMARY
