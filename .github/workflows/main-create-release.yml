@@ -1,0 +1,130 @@
+name: Create GitHub Release on Main Merge
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - main
+
+jobs:
+    create-github-release:
+        # Só executa se o PR foi mergeado E veio de uma branch release/*
+        if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            # 1. Fazer checkout da main
+            - name: Checkout main branch
+              uses: actions/checkout@v4
+              with:
+                  ref: main
+                  fetch-depth: 0
+
+            # 2. Extrair informações da branch de release
+            - name: Extract version info from branch
+              id: version_info
+              run: |
+                  RELEASE_BRANCH="${{ github.event.pull_request.head.ref }}"
+                  echo "Release branch: $RELEASE_BRANCH"
+
+                  # Extrair a versão e data da branch (formato: release/v*.yy.mm.dd)
+                  # Exemplo: release/v2.26.02.06 -> v2.26.02.06
+                  VERSION_TAG=$(echo "$RELEASE_BRANCH" | sed 's#release/##')
+                  echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+                  echo "Version tag: $VERSION_TAG"
+
+                  # Extrair apenas a versão (v1, v2, etc)
+                  BASE_VERSION=$(echo "$VERSION_TAG" | cut -d'.' -f1)
+                  echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+                  echo "Base version: $BASE_VERSION"
+
+            # 3. Encontrar o arquivo .zip mais recente
+            - name: Find latest zip file
+              id: find_zip
+              run: |
+                  # Procura por arquivos .zip que correspondem ao padrão mud_html_v*.*.*.*.zip
+                  # e pega o mais recente baseado no nome (que inclui a data)
+                  LATEST_ZIP=$(ls -t mud_html_${{ steps.version_info.outputs.base_version }}.*.zip 2>/dev/null | head -n1 || echo "")
+
+                  if [ -z "$LATEST_ZIP" ]; then
+                    echo "❌ Nenhum arquivo .zip encontrado para ${{ steps.version_info.outputs.base_version }}"
+                    exit 1
+                  fi
+
+                  echo "zip_file=$LATEST_ZIP" >> $GITHUB_OUTPUT
+                  echo "✅ Arquivo encontrado: $LATEST_ZIP"
+                  ls -lh "$LATEST_ZIP"
+
+            # 4. Verificar se a release já existe
+            - name: Check if release exists
+              id: check_release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  RELEASE_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" 2>/dev/null && echo "true" || echo "false")
+                  echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
+                  echo "Release exists: $RELEASE_EXISTS"
+
+            # 5. Criar a release do GitHub com o arquivo .zip
+            - name: Create GitHub Release
+              if: steps.check_release.outputs.exists == 'false'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh release create "${{ steps.version_info.outputs.version_tag }}" \
+                    "${{ steps.find_zip.outputs.zip_file }}" \
+                    --title "Release ${{ steps.version_info.outputs.version_tag }}" \
+                    --notes "## 🚀 Release ${{ steps.version_info.outputs.version_tag }}
+                    
+                    Esta release foi criada automaticamente após o merge do PR #${{ github.event.pull_request.number }}.
+                    
+                    ### 📦 Versão
+                    **${{ steps.version_info.outputs.base_version }}**
+                    
+                    ### 📅 Tag
+                    \`${{ steps.version_info.outputs.version_tag }}\`
+                    
+                    ### 📦 Arquivo
+                    \`${{ steps.find_zip.outputs.zip_file }}\`
+                    
+                    ### 🔗 Links
+                    - [Pull Request #${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})
+                    - [Branch de Release](${{ github.event.pull_request.head.ref }})
+                    
+                    ---
+                    *Esta release foi criada automaticamente pelo GitHub Actions*"
+
+                  echo "✅ Release criada com sucesso!"
+
+            # 6. Atualizar release existente (adicionar asset se necessário)
+            - name: Update existing release
+              if: steps.check_release.outputs.exists == 'true'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe"
+
+                  # Verifica se o asset já existe na release
+                  ASSET_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" --json assets --jq '.assets[].name' | grep -q "${{ steps.find_zip.outputs.zip_file }}" && echo "true" || echo "false")
+
+                  if [ "$ASSET_EXISTS" == "false" ]; then
+                    echo "📎 Adicionando arquivo à release existente..."
+                    gh release upload "${{ steps.version_info.outputs.version_tag }}" "${{ steps.find_zip.outputs.zip_file }}" --clobber
+                    echo "✅ Arquivo adicionado à release existente!"
+                  else
+                    echo "ℹ️ Arquivo já existe na release"
+                  fi
+
+            # 7. Resumo
+            - name: Summary
+              run: |
+                  echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Arquivo**: ${{ steps.find_zip.outputs.zip_file }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Status**: ${{ steps.check_release.outputs.exists == 'true' && 'Release atualizada' || 'Release criada' }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
