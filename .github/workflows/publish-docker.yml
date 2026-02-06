@@ -1,0 +1,136 @@
+name: Publish Docker Image
+
+on:
+    release:
+        types: [published]
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+    build-and-push:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            # 1. Checkout do código
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            # 2. Extrair informações da versão
+            - name: Extract version info
+              id: version
+              run: |
+                  # Tag da release (ex: v2.26.02.06)
+                  TAG_NAME="${{ github.event.release.tag_name }}"
+                  echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+                  echo "Release tag: $TAG_NAME"
+
+                  # Extrair versão base (v1, v2, etc) - primeiro componente antes do ponto
+                  BASE_VERSION=$(echo "$TAG_NAME" | cut -d'.' -f1)
+                  echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+                  echo "Base version: $BASE_VERSION"
+
+                  # Verificar se a pasta existe
+                  if [ ! -d "$BASE_VERSION" ]; then
+                    echo "❌ Pasta $BASE_VERSION não encontrada!"
+                    exit 1
+                  fi
+
+                  echo "✅ Versão encontrada: $BASE_VERSION"
+
+            # 3. Setup do Docker Buildx
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            # 4. Login no GitHub Container Registry
+            - name: Log in to Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ${{ env.REGISTRY }}
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            # 5. Extrair metadata para tags e labels
+            - name: Extract Docker metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+                  tags: |
+                      type=semver,pattern={{version}},value=${{ steps.version.outputs.tag }}
+                      type=semver,pattern={{major}}.{{minor}},value=${{ steps.version.outputs.tag }}
+                      type=raw,value=${{ steps.version.outputs.base_version }}-latest
+                      type=raw,value=latest,enable=${{ !github.event.release.prerelease }}
+
+            # 6. Build e push da imagem Docker
+            - name: Build and push Docker image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./${{ steps.version.outputs.base_version }}
+                  file: ./${{ steps.version.outputs.base_version }}/Dockerfile
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+                  platforms: linux/amd64,linux/arm64
+
+            # 7. Resumo
+            - name: Summary
+              run: |
+                  echo "## 🐳 Docker Image Published" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Release**: ${{ github.event.release.tag_name }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Version**: ${{ steps.version.outputs.base_version }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Registry**: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "### 🏷️ Tags criadas:" >> $GITHUB_STEP_SUMMARY
+                  echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+                  echo "${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+                  echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "### 📦 Como usar:" >> $GITHUB_STEP_SUMMARY
+                  echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+                  echo "# Versão específica" >> $GITHUB_STEP_SUMMARY
+                  echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "# Última versão estável" >> $GITHUB_STEP_SUMMARY
+                  echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+                  echo "" >> $GITHUB_STEP_SUMMARY
+                  echo "# Última versão de uma major version específica" >> $GITHUB_STEP_SUMMARY
+                  echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.base_version }}-latest" >> $GITHUB_STEP_SUMMARY
+                  echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+            # 8. Adicionar comentário na release
+            - name: Add comment to release
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  gh release view "${{ github.event.release.tag_name }}" --json body -q .body > release_body.txt
+
+                  echo "" >> release_body.txt
+                  echo "---" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "## 🐳 Imagem Docker Publicada" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "A imagem Docker foi publicada automaticamente no GitHub Container Registry!" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "### 📦 Como usar:" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "\`\`\`bash" >> release_body.txt
+                  echo "# Versão específica desta release" >> release_body.txt
+                  echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.tag }}" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "# Última versão do ${{ steps.version.outputs.base_version }}" >> release_body.txt
+                  echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.base_version }}-latest" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "# Última versão estável geral" >> release_body.txt
+                  echo "docker run -p 8000:8000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> release_body.txt
+                  echo "\`\`\`" >> release_body.txt
+                  echo "" >> release_body.txt
+                  echo "🔗 [Ver pacote no GitHub](https://github.com/${{ github.repository }}/pkgs/container/$(echo ${{ github.repository }} | cut -d'/' -f2))" >> release_body.txt
+
+                  gh release edit "${{ github.event.release.tag_name }}" --notes-file release_body.txt
