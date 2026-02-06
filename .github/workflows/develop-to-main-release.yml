@@ -101,8 +101,7 @@ jobs:
             ---
             *This PR was automatically created by GitHub Actions*" \
             --base main \
-            --head develop \
-            --label "release,automated"
+            --head develop
 
       - name: Generate changelog
         id: changelog
