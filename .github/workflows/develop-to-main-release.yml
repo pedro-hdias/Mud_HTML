@@ -111,9 +111,11 @@ jobs:
           echo "" >> CHANGELOG.md
           git log main..develop --pretty=format:"- %s (%h)" >> CHANGELOG.md
           cat CHANGELOG.md
-          echo "changelog<<EOF" >> $GITHUB_OUTPUT
-          cat CHANGELOG.md >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          {
+            echo "changelog<<CHANGELOG_DELIMITER_EOF"
+            cat CHANGELOG.md
+            echo "CHANGELOG_DELIMITER_EOF"
+          } >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
