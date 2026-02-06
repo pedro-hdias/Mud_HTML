@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web MUD Client</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+    <!-- Controles superiores -->
+    <div id="controls">
+        <button id="btnLogin" aria-label="Conectar ao servidor">Login</button>
+        <button id="btnDisconnect" aria-label="Desconectar do servidor" disabled>Desconectar</button>
+        <button id="btnClear" aria-label="Limpar tela" title="Limpar todo o histórico de saída">Limpar Tela</button>
+
+        <div id="statusIndicator">
+            <div id="statusDot"></div>
+            <span id="statusText">Desconectado</span>
+        </div>
+    </div>
+
+    <!-- Área de output -->
+    <div id="output" role="log" aria-live="polite" aria-atomic="false">
+    </div>
+
+    <!-- Área de input -->
+    <div id="inputArea">
+        <input id="input" type="text" placeholder="Digite um comando (múltiplos: use ;)" aria-label="Digite um comando"
+            disabled />
+        <button id="btnSend" aria-label="Enviar comando" title="Enviar comando" disabled>Enviar</button>
+    </div>
+
+    <!-- Modal de Login -->
+    <div id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+        <form id="loginForm">
+            <h2 id="loginTitle">Entrar no jogo</h2>
+
+            <label for="username">Nome de usuário:</label>
+            <input type="text" id="username" name="username" required autocomplete="username" />
+
+            <label for="password">Senha:</label>
+            <input type="password" id="password" name="password" required autocomplete="current-password" />
+
+            <div class="form-check">
+                <input type="checkbox" id="saveSession" name="saveSession" />
+                <label for="saveSession">Salvar credenciais por 30 dias</label>
+            </div>
+
+            <button type="submit">Entrar</button>
+            <button type="button" id="btnCancelLogin" style="margin-top: 10px;">Cancelar</button>
+        </form>
+    </div>
+
+    <!-- Modal de Confirmacao -->
+    <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+        <div id="confirmBox">
+            <h2 id="confirmTitle">Confirmacao</h2>
+            <pre id="confirmText"></pre>
+            <div class="confirm-actions">
+                <button type="button" id="btnConfirmYes">Sim</button>
+                <button type="button" id="btnConfirmNo" class="secondary">Nao</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ordem de carregamento importante: dependências primeiro -->
+    <script src="/static/js/logger.js"></script>
+    <script src="/static/js/config.js"></script>
+    <script src="/static/js/storage.js"></script>
+    <script src="/static/js/prompts.js"></script>
+    <script src="/static/js/modals.js"></script>
+    <script src="/static/js/state.js"></script>
+    <script src="/static/js/events.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/ws.js"></script>
+
+</body>
+
+</html>

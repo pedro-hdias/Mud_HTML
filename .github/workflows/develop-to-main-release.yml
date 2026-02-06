@@ -32,7 +32,7 @@ jobs:
           VERSIONS=$(ls -d v*/ 2>/dev/null | sed 's#/##' || echo "")
           echo "Found versions: $VERSIONS"
           echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
-          
+
           # Get the latest version for tagging
           LATEST_VERSION=$(ls -d v*/ 2>/dev/null | sed 's#/##' | sort -V | tail -n1 || echo "v1")
           echo "Latest version: $LATEST_VERSION"
@@ -57,16 +57,30 @@ jobs:
       - name: Checkout develop for PR
         run: git checkout develop
 
+      - name: Check for existing PR
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head develop --base main --json number --jq '.[0].number' || echo "")
+          if [ -n "$EXISTING_PR" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "PR already exists: #$EXISTING_PR"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No existing PR found"
+          fi
+
       - name: Create Pull Request to Main
-        id: create_pr
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: develop
-          base: main
-          title: "Release: Merge develop into main (${{ steps.date.outputs.date }})"
-          body: |
-            ## 🚀 Release PR from Develop to Main
+        if: steps.check_pr.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --title "Release: Merge develop into main (${{ steps.date.outputs.date }})" \
+            --body "## 🚀 Release PR from Develop to Main
             
             This PR was automatically created after merging changes into develop.
             
@@ -83,10 +97,12 @@ jobs:
             
             ### 📋 Changes
             Please review all changes from develop branch.
-          labels: |
-            release
-            automated
-          draft: false
+            
+            ---
+            *This PR was automatically created by GitHub Actions*" \
+            --base main \
+            --head develop \
+            --label "release,automated"
 
       - name: Generate changelog
         id: changelog
@@ -107,11 +123,11 @@ jobs:
           name: Release ${{ steps.versions.outputs.latest_version }} - ${{ steps.date.outputs.date }}
           body: |
             ## Release Notes
-            
+
             Automated release created from develop branch.
-            
+
             ${{ steps.changelog.outputs.changelog }}
-            
+
             ### Available Versions
             ${{ steps.versions.outputs.versions }}
           files: |

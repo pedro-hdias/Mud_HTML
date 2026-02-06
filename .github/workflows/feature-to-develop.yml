@@ -3,11 +3,14 @@ name: Create PR from Feature to Develop
 on:
   push:
     branches:
-      - 'feature/**'
+      - "feature/**"
 
 jobs:
   create-pr:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,32 +19,62 @@ jobs:
 
       - name: Extract branch name
         shell: bash
-        run: echo "BRANCH_NAME=${GITHUB_REF#refs/heads/}" >> $GITHUB_ENV
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "Branch: $BRANCH_NAME"
+
+      - name: Check if develop branch exists
+        run: |
+          git fetch origin develop:develop || echo "develop branch will be created"
+
+      - name: Check for existing PR
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "${{ env.BRANCH_NAME }}" --base develop --json number --jq '.[0].number' || echo "")
+          if [ -n "$EXISTING_PR" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "PR already exists: #$EXISTING_PR"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No existing PR found"
+          fi
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ env.BRANCH_NAME }}
-          base: develop
-          title: "Merge ${{ env.BRANCH_NAME }} into develop"
-          body: |
-            ## Automated PR from Feature Branch
-            
-            This PR was automatically created from branch `${{ env.BRANCH_NAME }}`.
-            
-            ### Changes
-            - Please review the changes in this feature branch
-            
-            ### Checklist
-            - [ ] Code reviewed
-            - [ ] Tests passing
-            - [ ] Documentation updated
-          labels: |
-            automated
-            feature
-          draft: false
-
-      - name: Check PR status
+        if: steps.check_pr.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Pull request created from ${{ env.BRANCH_NAME }} to develop"
+          gh pr create \
+            --title "Merge ${{ env.BRANCH_NAME }} into develop" \
+            --body "## 🚀 Automated PR from Feature Branch
+
+          This PR was automatically created from branch \`${{ env.BRANCH_NAME }}\`.
+
+          ### 📋 Changes
+          - Please review the changes in this feature branch
+
+          ### ✅ Checklist
+          - [ ] Code reviewed
+          - [ ] Tests passing
+          - [ ] Documentation updated
+
+          ---
+          *This PR was automatically created by GitHub Actions*" \
+            --base develop \
+            --head "${{ env.BRANCH_NAME }}" \
+            --label "automated,feature"
+
+      - name: PR Summary
+        run: |
+          if [ "${{ steps.check_pr.outputs.exists }}" == "true" ]; then
+            echo "## ℹ️ PR Already Exists" >> $GITHUB_STEP_SUMMARY
+            echo "PR #${{ steps.check_pr.outputs.pr_number }} already exists for this branch." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ PR Created Successfully" >> $GITHUB_STEP_SUMMARY
+            echo "Pull request created from \`${{ env.BRANCH_NAME }}\` to \`develop\`" >> $GITHUB_STEP_SUMMARY
+          fi
