@@ -28,8 +28,8 @@ jobs:
       - name: Identify version folders
         id: versions
         run: |
-          # Find all v* directories
-          VERSIONS=$(ls -d v*/ 2>/dev/null | sed 's#/##' || echo "")
+          # Find all v* directories (convert to space-separated list)
+          VERSIONS=$(ls -d v*/ 2>/dev/null | sed 's#/##' | tr '\n' ' ' | sed 's/ $//' || echo "")
           echo "Found versions: $VERSIONS"
           echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
 
@@ -101,8 +101,7 @@ jobs:
             ---
             *This PR was automatically created by GitHub Actions*" \
             --base main \
-            --head develop \
-            --label "release,automated"
+            --head develop
 
       - name: Generate changelog
         id: changelog

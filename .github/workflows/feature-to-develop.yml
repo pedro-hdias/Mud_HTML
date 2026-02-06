@@ -66,8 +66,7 @@ jobs:
           ---
           *This PR was automatically created by GitHub Actions*" \
             --base develop \
-            --head "${{ env.BRANCH_NAME }}" \
-            --label "automated,feature"
+            --head "${{ env.BRANCH_NAME }}"
 
       - name: PR Summary
         run: |
