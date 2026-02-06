@@ -14,56 +14,77 @@ jobs:
       contents: write
       pull-requests: write
     steps:
+      # 1. Baixar a develop
       - name: Checkout develop branch
         uses: actions/checkout@v4
         with:
           ref: develop
           fetch-depth: 0
 
-      - name: Checkout main branch
-        run: |
-          git fetch origin main:main
-          git checkout main
-
-      - name: Identify version folders
-        id: versions
-        run: |
-          # Find all v* directories (convert to space-separated list)
-          VERSIONS=$(ls -d v*/ 2>/dev/null | sed 's#/##' | tr '\n' ' ' | sed 's/ $//' || echo "")
-          echo "Found versions: $VERSIONS"
-          echo "versions=$VERSIONS" >> $GITHUB_OUTPUT
-
-          # Get the latest version for tagging
-          LATEST_VERSION=$(ls -d v*/ 2>/dev/null | sed 's#/##' | sort -V | tail -n1 || echo "v1")
-          echo "Latest version: $LATEST_VERSION"
-          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create version archives
-        run: |
-          mkdir -p releases
-          for version in ${{ steps.versions.outputs.versions }}; do
-            if [ -d "$version" ]; then
-              echo "Compressing $version..."
-              zip -r "releases/${version}.zip" "$version"
-              tar -czf "releases/${version}.tar.gz" "$version"
-            fi
-          done
-          ls -lh releases/
-
+      # 2. Obter a data de hoje no formato yy.mm.dd
       - name: Get current date
         id: date
-        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        run: |
+          DATE_FORMATTED=$(date +'%y.%m.%d')
+          echo "date=$DATE_FORMATTED" >> $GITHUB_OUTPUT
+          echo "Current date: $DATE_FORMATTED"
 
-      - name: Checkout develop for PR
-        run: git checkout develop
+      # 3. Encontrar as pastas v* e 4. Ver qual a v* de número maior
+      - name: Identify latest version
+        id: version
+        run: |
+          LATEST_VERSION=$(ls -d v*/ 2>/dev/null | sed 's#/##' | sort -V | tail -n1 || echo "v1")
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest version found: $LATEST_VERSION"
 
+      # 5. Criar branch release/v*.yy.mm.dd a partir da develop
+      - name: Create release branch
+        id: release_branch
+        run: |
+          RELEASE_BRANCH="release/${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}"
+          echo "branch=$RELEASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "Creating branch: $RELEASE_BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$RELEASE_BRANCH"
+
+      # 6. Compactar a pasta v* maior em formato mud_html_v*.yy.mm.dd.zip
+      - name: Create version archive
+        run: |
+          ARCHIVE_NAME="mud_html_${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}.zip"
+          echo "Creating archive: $ARCHIVE_NAME"
+          zip -r "$ARCHIVE_NAME" "${{ steps.version.outputs.latest_version }}"
+          ls -lh *.zip
+
+      # 7. Commitar "v* created"
+      - name: Commit archive
+        run: |
+          git add mud_html_${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}.zip
+          git commit -m "${{ steps.version.outputs.latest_version }} created"
+
+      # 8. Criar a tag no formato v*.yy.mm.dd
+      - name: Create tag
+        id: tag
+        run: |
+          TAG_NAME="${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}"
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "Creating tag: $TAG_NAME"
+          git tag "$TAG_NAME"
+
+      # 9. Fazer o push de tudo (branch + tag)
+      - name: Push branch and tag
+        run: |
+          git push origin "${{ steps.release_branch.outputs.branch }}"
+          git push origin "${{ steps.tag.outputs.tag }}"
+          echo "Pushed branch and tag successfully"
+
+      # 10. Criar o PR para a main
       - name: Check for existing PR
         id: check_pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Check if PR already exists
-          EXISTING_PR=$(gh pr list --head develop --base main --json number --jq '.[0].number' || echo "")
+          EXISTING_PR=$(gh pr list --head "${{ steps.release_branch.outputs.branch }}" --base main --json number --jq '.[0].number' || echo "")
           if [ -n "$EXISTING_PR" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
@@ -79,71 +100,39 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr create \
-            --title "Release: Merge develop into main (${{ steps.date.outputs.date }})" \
-            --body "## 🚀 Release PR from Develop to Main
+            --title "Release ${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}" \
+            --body "## 🚀 Release ${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}
             
-            This PR was automatically created after merging changes into develop.
+            This PR was automatically created from the release branch.
             
-            ### 📦 Versions Available
-            ${{ steps.versions.outputs.versions }}
+            ### 📦 Version
+            **${{ steps.version.outputs.latest_version }}**
             
             ### 📅 Release Date
             ${{ steps.date.outputs.date }}
             
+            ### 📦 Archive
+            \`mud_html_${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}.zip\`
+            
+            ### 🏷️ Tag
+            \`${{ steps.tag.outputs.tag }}\`
+            
             ### ✅ Checklist
             - [ ] All tests passing
             - [ ] Documentation updated
-            - [ ] Version artifacts ready for release
-            
-            ### 📋 Changes
-            Please review all changes from develop branch.
+            - [ ] Archive created and committed
             
             ---
             *This PR was automatically created by GitHub Actions*" \
             --base main \
-            --head develop
-
-      - name: Generate changelog
-        id: changelog
-        run: |
-          git checkout develop
-          echo "## Changelog" > CHANGELOG.md
-          echo "" >> CHANGELOG.md
-          git log main..develop --pretty=format:"- %s (%h)" >> CHANGELOG.md
-          cat CHANGELOG.md
-          {
-            echo "changelog<<CHANGELOG_DELIMITER_EOF"
-            cat CHANGELOG.md
-            echo "CHANGELOG_DELIMITER_EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ steps.versions.outputs.latest_version }}-${{ steps.date.outputs.date }}
-          name: Release ${{ steps.versions.outputs.latest_version }} - ${{ steps.date.outputs.date }}
-          body: |
-            ## Release Notes
-
-            Automated release created from develop branch.
-
-            ${{ steps.changelog.outputs.changelog }}
-
-            ### Available Versions
-            ${{ steps.versions.outputs.versions }}
-          files: |
-            releases/*.zip
-            releases/*.tar.gz
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            --head "${{ steps.release_branch.outputs.branch }}"
 
       - name: Summary
         run: |
           echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Latest Version**: ${{ steps.versions.outputs.latest_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Release Tag**: ${{ steps.versions.outputs.latest_version }}-${{ steps.date.outputs.date }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **PR Created**: Ready for review and merge to main" >> $GITHUB_STEP_SUMMARY
-          echo "- **Artifacts**: $(ls releases/ | wc -l) files compressed" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ steps.version.outputs.latest_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Branch**: ${{ steps.release_branch.outputs.branch }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Archive**: mud_html_${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}.zip" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR**: Ready for review and merge to main" >> $GITHUB_STEP_SUMMARY
