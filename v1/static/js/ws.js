@@ -115,12 +115,17 @@ function handleHistoryMessage(msg) {
 }
 
 function handleLineMessage(msg) {
-    const lineEl = document.createElement("div");
-    lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.new}`;
-    lineEl.textContent = msg.content.trimEnd();
-
     const output = getElement(CONFIG.SELECTORS.output);
-    if (output) {
+    if (!output) return;
+
+    // Tenta processar como parte de um menu interativo
+    const isMenuLine = MenuManager.processLine(msg.content, output);
+
+    // Se não for linha de menu, processa normalmente
+    if (!isMenuLine) {
+        const lineEl = document.createElement("div");
+        lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.new}`;
+        lineEl.textContent = msg.content.trimEnd();
         output.appendChild(lineEl);
         output.scrollTop = output.scrollHeight;
     }
@@ -134,8 +139,8 @@ function handleLineMessage(msg) {
         checkAndShowLogin();
     }
 
-    // Verifica se é um prompt de confirmação
-    if (PromptDetector.shouldShowConfirmPrompt(msg.content)) {
+    // Verifica se é um prompt de confirmação (apenas se não for menu)
+    if (!isMenuLine && PromptDetector.shouldShowConfirmPrompt(msg.content)) {
         const promptMessage = PromptDetector.buildConfirmMessage(msg.content);
         showConfirmModal(promptMessage);
     }
