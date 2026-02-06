@@ -28,41 +28,18 @@ jobs:
                   RELEASE_BRANCH="${{ github.event.pull_request.head.ref }}"
                   echo "Release branch: $RELEASE_BRANCH"
 
-                  # Extrair a versão e data da branch (formato: release/v*.yy.mm.dd)
-                  # Exemplo: release/v2.26.02.06 -> v2.26.02.06
-                  BASE_TAG=$(echo "$RELEASE_BRANCH" | sed 's#release/##')
-                  echo "base_tag=$BASE_TAG" >> $GITHUB_OUTPUT
-                  echo "Base tag: $BASE_TAG"
+                  # Extrair a versão e data da branch (formato: release/v*.yy.mm.dd.hhmm)
+                  # Exemplo: release/v2.26.02.06.1430 -> v2.26.02.06.1430
+                  VERSION_TAG=$(echo "$RELEASE_BRANCH" | sed 's#release/##')
+                  echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+                  echo "Version tag: $VERSION_TAG"
 
                   # Extrair apenas a versão (v1, v2, etc)
-                  BASE_VERSION=$(echo "$BASE_TAG" | cut -d'.' -f1)
+                  BASE_VERSION=$(echo "$VERSION_TAG" | cut -d'.' -f1)
                   echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
                   echo "Base version: $BASE_VERSION"
 
-            # 3. Verificar se a tag já existe e criar tag única com timestamp
-            - name: Generate unique tag with timestamp
-              id: unique_tag
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  BASE_TAG="${{ steps.version_info.outputs.base_tag }}"
-
-                  # Verifica se a tag base já existe
-                  if git rev-parse "refs/tags/$BASE_TAG" >/dev/null 2>&1 || gh release view "$BASE_TAG" >/dev/null 2>&1; then
-                    # Tag já existe, adiciona timestamp (hora e minuto)
-                    TIMESTAMP=$(date -u +"%H%M")
-                    FINAL_TAG="${BASE_TAG}-${TIMESTAMP}"
-                    echo "⚠️ Tag $BASE_TAG já existe, usando timestamp: $FINAL_TAG"
-                  else
-                    # Tag não existe, usa a tag base sem sufixo
-                    FINAL_TAG="$BASE_TAG"
-                    echo "✅ Tag disponível: $FINAL_TAG"
-                  fi
-
-                  echo "version_tag=$FINAL_TAG" >> $GITHUB_OUTPUT
-                  echo "Tag final: $FINAL_TAG"
-
-            # 4. Encontrar o arquivo .zip mais recente
+            # 3. Encontrar o arquivo .zip mais recente
             - name: Find latest zip file
               id: find_zip
               run: |
@@ -79,26 +56,26 @@ jobs:
                   echo "✅ Arquivo encontrado: $LATEST_ZIP"
                   ls -lh "$LATEST_ZIP"
 
-            # 5. Verificar se a release já existe
+            # 4. Verificar se a release já existe
             - name: Check if release exists
               id: check_release
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  RELEASE_EXISTS=$(gh release view "${{ steps.unique_tag.outputs.version_tag }}" 2>/dev/null && echo "true" || echo "false")
+                  RELEASE_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" 2>/dev/null && echo "true" || echo "false")
                   echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
                   echo "Release exists: $RELEASE_EXISTS"
 
-            # 6. Criar a release do GitHub com o arquivo .zip
+            # 5. Criar a release do GitHub com o arquivo .zip
             - name: Create GitHub Release
               if: steps.check_release.outputs.exists == 'false'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  gh release create "${{ steps.unique_tag.outputs.version_tag }}" \
+                  gh release create "${{ steps.version_info.outputs.version_tag }}" \
                     "${{ steps.find_zip.outputs.zip_file }}" \
-                    --title "Release ${{ steps.unique_tag.outputs.version_tag }}" \
-                    --notes "## 🚀 Release ${{ steps.unique_tag.outputs.version_tag }}
+                    --title "Release ${{ steps.version_info.outputs.version_tag }}" \
+                    --notes "## 🚀 Release ${{ steps.version_info.outputs.version_tag }}
                     
                     Esta release foi criada automaticamente após o merge do PR #${{ github.event.pull_request.number }}.
                     
@@ -106,7 +83,7 @@ jobs:
                     **${{ steps.version_info.outputs.base_version }}**
                     
                     ### 📅 Tag
-                    \`${{ steps.unique_tag.outputs.version_tag }}\`
+                    \`${{ steps.version_info.outputs.version_tag }}\`
                     
                     ### 📦 Arquivo
                     \`${{ steps.find_zip.outputs.zip_file }}\`
@@ -120,34 +97,34 @@ jobs:
 
                   echo "✅ Release criada com sucesso!"
 
-            # 7. Atualizar release existente (adicionar asset se necessário)
+            # 6. Atualizar release existente (adicionar asset se necessário)
             - name: Update existing release
               if: steps.check_release.outputs.exists == 'true'
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  echo "ℹ️ Release ${{ steps.unique_tag.outputs.version_tag }} já existe"
+                  echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe"
 
                   # Verifica se o asset já existe na release
-                  ASSET_EXISTS=$(gh release view "${{ steps.unique_tag.outputs.version_tag }}" --json assets --jq '.assets[].name' | grep -q "${{ steps.find_zip.outputs.zip_file }}" && echo "true" || echo "false")
+                  ASSET_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" --json assets --jq '.assets[].name' | grep -q "${{ steps.find_zip.outputs.zip_file }}" && echo "true" || echo "false")
 
                   if [ "$ASSET_EXISTS" == "false" ]; then
                     echo "📎 Adicionando arquivo à release existente..."
-                    gh release upload "${{ steps.unique_tag.outputs.version_tag }}" "${{ steps.find_zip.outputs.zip_file }}" --clobber
+                    gh release upload "${{ steps.version_info.outputs.version_tag }}" "${{ steps.find_zip.outputs.zip_file }}" --clobber
                     echo "✅ Arquivo adicionado à release existente!"
                   else
                     echo "ℹ️ Arquivo já existe na release"
                   fi
 
-            # 8. Resumo
+            # 7. Resumo
             - name: Summary
               run: |
                   echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
                   echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
                   echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Tag**: ${{ steps.unique_tag.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+                  echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
                   echo "- **Arquivo**: ${{ steps.find_zip.outputs.zip_file }}" >> $GITHUB_STEP_SUMMARY
                   echo "- **Status**: ${{ steps.check_release.outputs.exists == 'true' && 'Release atualizada' || 'Release criada' }}" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.unique_tag.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
+                  echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
