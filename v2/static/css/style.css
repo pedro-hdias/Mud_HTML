@@ -1,0 +1,488 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: system-ui, Arial, sans-serif;
+    background: #000;
+    color: #eee;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Controles superiores */
+#controls {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background: #111;
+    border-bottom: 1px solid #333;
+}
+
+#controls button {
+    padding: 8px 16px;
+    font-size: 14px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+#btnLogin {
+    background: #28a745;
+    color: white;
+}
+
+#btnLogin:hover:not(:disabled) {
+    background: #218838;
+}
+
+#btnDisconnect {
+    background: #dc3545;
+    color: white;
+}
+
+#btnDisconnect:hover:not(:disabled) {
+    background: #c82333;
+}
+
+#controls button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+#statusIndicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    font-size: 14px;
+    color: #aaa;
+}
+
+#statusDot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #666;
+}
+
+#statusDot.connected {
+    background: #28a745;
+    box-shadow: 0 0 8px #28a745;
+}
+
+#statusDot.connecting {
+    background: #ffc107;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Botão Limpar Tela */
+#btnClear {
+    background: #6c757d;
+    color: white;
+}
+
+#btnClear:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+/* Área de output */
+#output {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.output-line {
+    margin: 0;
+}
+
+.system-message {
+    color: #ffc107;
+    font-style: italic;
+    margin: 5px 0;
+}
+
+/* Input área */
+#inputArea {
+    display: flex;
+    border-top: 1px solid #333;
+}
+
+#input {
+    flex: 1;
+    border: none;
+    padding: 12px;
+    font-size: 16px;
+    outline: none;
+    background: #111;
+    color: #eee;
+    font-family: 'Courier New', monospace;
+    resize: none;
+    max-height: 100px;
+    overflow-y: auto;
+}
+
+#input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Botão de envio */
+#btnSend {
+    padding: 12px 20px;
+    border: none;
+    background: #28a745;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    border-left: 1px solid #333;
+    transition: background 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+#btnSend:hover:not(:disabled) {
+    background: #218838;
+}
+
+#btnSend:active:not(:disabled) {
+    background: #1e7e34;
+}
+
+#btnSend:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Modal de Login */
+#loginModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+#loginModal.show {
+    display: flex;
+}
+
+#loginForm {
+    background: #222;
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    min-width: 300px;
+    max-width: 90%;
+}
+
+#loginForm h2 {
+    margin: 0 0 20px 0;
+    color: #fff;
+    font-size: 20px;
+}
+
+#loginForm label {
+    display: block;
+    margin-bottom: 8px;
+    color: #ccc;
+    font-size: 14px;
+}
+
+#loginForm input[type="text"],
+#loginForm input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 16px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    background: #111;
+    color: #eee;
+    font-size: 14px;
+}
+
+#loginForm input:focus {
+    outline: none;
+    border-color: #28a745;
+}
+
+.form-check {
+    margin-bottom: 20px;
+}
+
+.form-check input {
+    margin-right: 8px;
+}
+
+.form-check label {
+    display: inline;
+    cursor: pointer;
+}
+
+#loginForm button {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    background: #28a745;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+#loginForm button:hover {
+    background: #218838;
+}
+
+#loginForm button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Modal de Confirmacao */
+#confirmModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1100;
+    align-items: center;
+    justify-content: center;
+}
+
+#confirmModal.show {
+    display: flex;
+}
+
+#confirmBox {
+    background: #1a1a1a;
+    padding: 24px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    min-width: 320px;
+    max-width: 90%;
+}
+
+#confirmBox h2 {
+    margin: 0 0 16px 0;
+    color: #fff;
+    font-size: 20px;
+}
+
+#confirmText {
+    margin: 0 0 20px 0;
+    color: #ddd;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    white-space: pre-wrap;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.confirm-actions button {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 4px;
+    background: #28a745;
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.confirm-actions button:hover {
+    background: #218838;
+}
+
+.confirm-actions button.secondary {
+    background: #6c757d;
+}
+
+.confirm-actions button.secondary:hover {
+    background: #5a6268;
+}
+
+/* Menus interativos acessíveis */
+.menu-container {
+    margin: 10px 0;
+    padding: 10px;
+    background: #1a1a1a;
+    border-left: 3px solid #28a745;
+    border-radius: 4px;
+}
+
+.menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.menu-list li {
+    margin: 0;
+    padding: 0;
+}
+
+.menu-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: left;
+    color: inherit;
+}
+
+.menu-option:hover:not(:disabled) {
+    background: #3a3a3a;
+    border-color: #28a745;
+    transform: translateX(4px);
+}
+
+.menu-option:focus {
+    outline: 2px solid #28a745;
+    outline-offset: 2px;
+}
+
+.menu-option:focus-visible {
+    outline: 2px solid #28a745;
+    outline-offset: 2px;
+    background: #3a3a3a;
+}
+
+.menu-option:active:not(:disabled) {
+    transform: translateX(2px);
+    background: #4a4a4a;
+}
+
+.menu-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.menu-number {
+    font-weight: bold;
+    color: #28a745;
+    font-family: 'Courier New', monospace;
+    min-width: 30px;
+}
+
+.menu-text {
+    color: #eee;
+    flex: 1;
+}
+
+.menu-prompt {
+    margin-top: 10px;
+    padding: 8px;
+    color: #ffc107;
+    font-style: italic;
+    text-align: center;
+}
+
+.menu-option-selected {
+    background: #28a745 !important;
+    border-color: #28a745 !important;
+}
+
+.menu-option-selected .menu-number {
+    color: #fff;
+}
+
+.menu-option-selected .menu-text {
+    color: #fff;
+    font-weight: 500;
+}
+
+.menu-inactive {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.menu-inactive .menu-option {
+    cursor: default;
+}
+
+/* Suporte para alto contraste */
+@media (prefers-contrast: high) {
+    .menu-option {
+        border-width: 2px;
+    }
+
+    .menu-option:focus,
+    .menu-option:focus-visible {
+        outline-width: 3px;
+    }
+}
+
+/* Suporte para modo reduzir movimento */
+@media (prefers-reduced-motion: reduce) {
+    .menu-option {
+        transition: none;
+    }
+
+    .menu-option:hover:not(:disabled) {
+        transform: none;
+    }
+}
+
+/* Responsividade mobile */
+@media (max-width: 768px) {
+    #controls {
+        flex-wrap: wrap;
+    }
+
+    #statusIndicator {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    #output {
+        font-size: 13px;
+    }
+}

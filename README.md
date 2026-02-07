@@ -33,7 +33,7 @@ Acesse: [http://localhost:8000](http://localhost:8000)
 ```bash
 cd v2  # ou v1
 docker build -t mudclient .
-docker run -p 8000:8000 mudclient
+docker run -d -p 8000:8000 mudclient
 ```
 
 Acesse: [http://localhost:8000](http://localhost:8000)
