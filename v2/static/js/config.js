@@ -13,7 +13,8 @@ const CONFIG = {
         LOGGED_IN: 'mud_logged_in',
         ALLOW_LOGIN: 'mud_allow_login',
         WAS_CONNECTED: 'mud_was_connected',
-        SESSION_ID: 'mud_session_id'
+        PUBLIC_ID: 'mud_public_id',
+        OWNER: 'mud_owner'
     },
 
     // Seletores DOM
@@ -90,3 +91,4 @@ function getElement(selector) {
 function getAllElements(selector) {
     return document.querySelectorAll(selector);
 }
+

@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  mud-html:
+    build: ./v2
+    container_name: mud-html-dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./v2:/app
+      - /app/app/__pycache__
+      - /app/app/mud/__pycache__
+      - /app/app/sessions/__pycache__
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

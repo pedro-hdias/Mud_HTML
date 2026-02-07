@@ -143,8 +143,8 @@ const StorageManager = {
         storageLogger.log("All storage cleared");
     },
 
-    // Gerenciamento de sessionId
-    generateSessionId() {
+    // Gerenciamento de publicId
+    generatePublicId() {
         // Gera UUID v4 simples
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             const r = Math.random() * 16 | 0;
@@ -153,20 +153,42 @@ const StorageManager = {
         });
     },
 
-    getOrCreateSessionId() {
-        let sessionId = this.getItem(CONFIG.STORAGE_KEYS.SESSION_ID);
-        if (!sessionId) {
-            sessionId = this.generateSessionId();
-            this.setItem(CONFIG.STORAGE_KEYS.SESSION_ID, sessionId);
-            storageLogger.log("New sessionId created", { sessionId });
+    getOrCreatePublicId() {
+        let publicId = this.getItem(CONFIG.STORAGE_KEYS.PUBLIC_ID);
+        if (!publicId) {
+            publicId = this.generatePublicId();
+            this.setItem(CONFIG.STORAGE_KEYS.PUBLIC_ID, publicId);
+            storageLogger.log("New publicId created", { publicId });
         } else {
-            storageLogger.log("Existing sessionId retrieved", { sessionId });
+            storageLogger.log("Existing publicId retrieved", { publicId });
         }
-        return sessionId;
+        return publicId;
     },
 
-    clearSessionId() {
-        this.removeItem(CONFIG.STORAGE_KEYS.SESSION_ID);
-        storageLogger.log("SessionId cleared");
+    clearPublicId() {
+        this.removeItem(CONFIG.STORAGE_KEYS.PUBLIC_ID);
+        storageLogger.log("publicId cleared");
+    },
+
+    setOwner(token) {
+        this.setItem(CONFIG.STORAGE_KEYS.OWNER, token);
+        storageLogger.log("Ownership token saved");
+    },
+
+    getOwner() {
+        return this.getItem(CONFIG.STORAGE_KEYS.OWNER);
+    },
+
+    clearOwner() {
+        this.removeItem(CONFIG.STORAGE_KEYS.OWNER);
+        storageLogger.log("Ownership token cleared");
+    },
+
+    clearSession() {
+        this.clearPublicId();
+        this.clearOwner();
+        storageLogger.log("Session fully cleared (ID + token)");
     }
 };
+
+

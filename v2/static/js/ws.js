@@ -12,8 +12,9 @@ let lastCommandSent = "";
 let reconnectAttempts = 0;
 let reconnectTimeout = null;
 let isManualDisconnect = false;
-const MAX_RECONNECT_ATTEMPTS = 10;
-const RECONNECT_DELAY_MS = 2000;
+let allowReconnect = false;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_DELAY_MS = 3000;
 
 // Flag para indicar reconexão
 window.isReconnecting = false;
@@ -43,22 +44,29 @@ function connectWebSocket() {
 function scheduleReconnect() {
     if (isManualDisconnect) {
         wsLogger.log("Manual disconnect - not reconnecting");
+        allowReconnect = false;
+        return;
+    }
+
+    if (!allowReconnect) {
+        wsLogger.log("Auto-reconnect not allowed - waiting for user action");
         return;
     }
 
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         wsLogger.error("Max reconnect attempts reached");
+        allowReconnect = false;
         const sysMsg = document.createElement("div");
         sysMsg.className = CONFIG.CLASSES.systemMessage;
         sysMsg.style.color = "red";
-        sysMsg.textContent = "[SISTEMA] Falha ao reconectar após várias tentativas. Recarregue a página.";
+        sysMsg.textContent = "[SISTEMA] Falha ao reconectar após várias tentativas. Clique em 'Login' para tentar novamente.";
         const output = getElement(CONFIG.SELECTORS.output);
         if (output) output.appendChild(sysMsg);
         return;
     }
 
     reconnectAttempts++;
-    const delay = RECONNECT_DELAY_MS * reconnectAttempts;
+    const delay = RECONNECT_DELAY_MS;
     wsLogger.log(`Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
 
     reconnectTimeout = setTimeout(() => {
@@ -81,15 +89,27 @@ function handleWebSocketOpen() {
         reconnectTimeout = null;
     }
 
-    // Obtém ou cria sessionId
-    const sessionId = StorageManager.getOrCreateSessionId();
-    wsLogger.log("Initializing session", { sessionId });
+    // Se conectou com sucesso, permitir reconexão automática em caso de queda
+    if (!isManualDisconnect) {
+        allowReconnect = true;
+    }
 
-    // Envia mensagem de inicialização
-    ws.send(JSON.stringify({
+    // Obtém ou cria publicId e owner token
+    const publicId = StorageManager.getOrCreatePublicId();
+    const owner = StorageManager.getOwner();
+    wsLogger.log("Initializing session", { publicId, hasToken: !!owner });
+
+    // Envia mensagem de inicialização (com token se existir)
+    const initMsg = {
         type: "init",
-        sessionId: sessionId
-    }));
+        publicId: publicId
+    };
+
+    if (owner) {
+        initMsg.owner = owner;
+    }
+
+    ws.send(JSON.stringify(initMsg));
 }
 
 /**
@@ -103,6 +123,9 @@ function handleWebSocketMessage(event) {
         switch (msg.type) {
             case "init_ok":
                 handleInitOkMessage(msg);
+                break;
+            case "session_invalid":
+                handleSessionInvalidMessage(msg);
                 break;
             case "state":
                 handleStateMessage(msg);
@@ -140,18 +163,35 @@ function handleWebSocketError(error) {
 function handleWebSocketClose(event) {
     wsLogger.warn("WebSocket closed", { code: event.code, reason: event.reason });
 
+    const output = getElement(CONFIG.SELECTORS.output);
     const sysMsg = document.createElement("div");
     sysMsg.className = CONFIG.CLASSES.systemMessage;
 
-    if (isManualDisconnect) {
+    // Código 4003 = sessão inválida (owner ou manual disconnect)
+    if (event.code === 4003) {
+        wsLogger.warn("Session invalidated by server - generating new session");
+        sysMsg.textContent = "[SISTEMA] Sessão inválida. Clique em 'Login' para conectar novamente.";
+        sysMsg.style.color = "orange";
+
+        // Limpa publicId e token para forçar geração de novos
+        StorageManager.clearSession();
+        allowReconnect = false;
+        updateConnectionState("DISCONNECTED");
+    } else if (isManualDisconnect) {
         sysMsg.textContent = "[SISTEMA] Desconectado";
+        // Limpa sessão em desconexão manual
+        StorageManager.clearSession();
+        allowReconnect = false;
+        updateConnectionState("DISCONNECTED");
     } else {
-        sysMsg.textContent = "[SISTEMA] Conexão perdida - tentando reconectar...";
+        // Conexão perdida involuntariamente
+        if (reconnectAttempts === 0) {
+            sysMsg.textContent = "[SISTEMA] Conexão perdida - tentando reconectar...";
+        }
         scheduleReconnect();
     }
 
-    const output = getElement(CONFIG.SELECTORS.output);
-    if (output) {
+    if (output && sysMsg.textContent) {
         output.appendChild(sysMsg);
         output.scrollTop = output.scrollHeight;
     }
@@ -160,7 +200,30 @@ function handleWebSocketClose(event) {
 // ===== Message Handlers =====
 
 function handleInitOkMessage(msg) {
-    wsLogger.log("Session initialized", { sessionId: msg.sessionId });
+    wsLogger.log("Session initialized", {
+        publicId: msg.publicId,
+        status: msg.status,
+        hasHistory: msg.hasHistory
+    });
+
+    // Salva o owner token recebido do servidor
+    if (msg.owner) {
+        StorageManager.setOwner(msg.owner);
+        wsLogger.log("owner token saved");
+    }
+
+    // Exibe feedback baseado no status
+    if (msg.status === "created") {
+        wsLogger.log("New session created");
+    } else if (msg.status === "recovered") {
+        wsLogger.log("Session recovered successfully");
+        const sysMsg = document.createElement("div");
+        sysMsg.className = CONFIG.CLASSES.systemMessage;
+        sysMsg.textContent = "[SISTEMA] Sessão recuperada com sucesso!";
+        sysMsg.style.color = "#4CAF50";
+        const output = getElement(CONFIG.SELECTORS.output);
+        if (output) output.appendChild(sysMsg);
+    }
 
     // Se há credenciais salvas, estamos reconectando
     if (savedCredentials && window.isReconnecting) {
@@ -169,6 +232,27 @@ function handleInitOkMessage(msg) {
             ws.send(JSON.stringify({ type: "connect" }));
         }, CONFIG.TIMEOUTS.backendReadyDelay);
     }
+}
+
+function handleSessionInvalidMessage(msg) {
+    wsLogger.error("Session invalidated by server", {
+        reason: msg.reason,
+        message: msg.message
+    });
+
+    const sysMsg = document.createElement("div");
+    sysMsg.className = CONFIG.CLASSES.systemMessage;
+    sysMsg.style.color = "orange";
+    sysMsg.textContent = `[SISTEMA] ${msg.message}`;
+
+    const output = getElement(CONFIG.SELECTORS.output);
+    if (output) {
+        output.appendChild(sysMsg);
+        output.scrollTop = output.scrollHeight;
+    }
+
+    // O WebSocket será fechado pelo servidor com código 4003
+    // O handler onclose cuidará da limpeza e reconexão
 }
 
 function handleStateMessage(msg) {
@@ -214,12 +298,17 @@ function handleHistoryMessage(msg) {
 }
 
 function handleLineMessage(msg) {
-    const lineEl = document.createElement("div");
-    lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.new}`;
-    lineEl.textContent = msg.content.trimEnd();
-
     const output = getElement(CONFIG.SELECTORS.output);
-    if (output) {
+    if (!output) return;
+
+    // Tenta processar como parte de um menu interativo
+    const isMenuLine = MenuManager.processLine(msg.content, output);
+
+    // Se não for linha de menu, processa normalmente
+    if (!isMenuLine) {
+        const lineEl = document.createElement("div");
+        lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.new}`;
+        lineEl.textContent = msg.content.trimEnd();
         output.appendChild(lineEl);
         output.scrollTop = output.scrollHeight;
     }
@@ -239,8 +328,8 @@ function handleLineMessage(msg) {
         checkAndShowLogin();
     }
 
-    // Verifica se é um prompt de confirmação
-    if (PromptDetector.shouldShowConfirmPrompt(msg.content)) {
+    // Verifica se é um prompt de confirmação (apenas se não for menu)
+    if (!isMenuLine && PromptDetector.shouldShowConfirmPrompt(msg.content)) {
         const promptMessage = PromptDetector.buildConfirmMessage(msg.content);
         showConfirmModal(promptMessage);
     }
@@ -302,17 +391,6 @@ function getLastCommandSent() {
     return lastCommandSent;
 }
 
-// Inicializa WebSocket quando o DOM estiver pronto
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        wsLogger.log("DOM ready - initializing WebSocket");
-        connectWebSocket();
-    });
-} else {
-    wsLogger.log("DOM already loaded - initializing WebSocket");
-    connectWebSocket();
-}
-
 /**
  * Envia credenciais de login
  */
@@ -329,3 +407,4 @@ function sendLogin(username, password) {
         password: password
     }));
 }
+

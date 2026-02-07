@@ -176,22 +176,30 @@ const EventManager = {
 
     // Handlers
     handleLoginClick() {
-        // Reseta flag de desconexão manual ao tentar conectar
+        eventsLogger.log("Login button clicked - initiating connection");
+
+        // Reseta flags de desconexão manual ao tentar conectar
         if (typeof isManualDisconnect !== 'undefined') {
             isManualDisconnect = false;
+        }
+        if (typeof allowReconnect !== 'undefined') {
+            allowReconnect = true;
         }
 
         // Reseta flag de dismissal do modal para nova conexão
         ModalManager.resetLoginModalDismissal();
 
-        if (typeof ws !== 'undefined' && ws.readyState === WebSocket.OPEN) {
+        allowLoginPrompt = true;
+        loginShown = false;
+        StateManager.saveLoginState();
+
+        if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: "connect" }));
-            allowLoginPrompt = true;
-            loginShown = false;
-            StateManager.saveLoginState();
+        } else if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.CONNECTING) {
+            eventsLogger.log("WebSocket is connecting, waiting for connection");
         } else {
-            eventsLogger.error("WebSocket not available or not open");
-            // Tenta reconectar se disponível
+            eventsLogger.log("WebSocket not connected - establishing connection");
+            // Conecta o WebSocket
             if (typeof connectWebSocket === 'function') {
                 connectWebSocket();
             }
@@ -199,12 +207,17 @@ const EventManager = {
     },
 
     handleDisconnectClick() {
+        eventsLogger.log("Disconnect button clicked - closing connection");
+
         // Marca como desconexão manual para não tentar reconectar
         if (typeof isManualDisconnect !== 'undefined') {
             isManualDisconnect = true;
         }
+        if (typeof allowReconnect !== 'undefined') {
+            allowReconnect = false;
+        }
 
-        if (typeof ws !== 'undefined' && ws.readyState === WebSocket.OPEN) {
+        if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: "disconnect" }));
         }
         allowLoginPrompt = false;

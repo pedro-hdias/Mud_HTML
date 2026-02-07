@@ -16,6 +16,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.on_event("startup")
 async def on_startup():
     logger.debug("Application startup")
+    
+    # Invalida todas as sessões anteriores
+    await session_manager.invalidate_all_sessions()
+    logger.info("Previous sessions invalidated")
+    
     # Inicia task de limpeza de sessões inativas
     await session_manager.start_cleanup_task()
     logger.info("Session cleanup task started")
