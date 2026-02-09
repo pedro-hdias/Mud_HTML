@@ -186,11 +186,19 @@ const EventManager = {
             allowReconnect = true;
         }
 
+        // Marca que o usuário solicitou conexão (usado após init_ok)
+        if (typeof connectRequested !== 'undefined') {
+            connectRequested = true;
+        }
+
         // Reseta flag de dismissal do modal para nova conexão
         ModalManager.resetLoginModalDismissal();
 
         allowLoginPrompt = true;
         loginShown = false;
+        if (typeof loginModalScheduled !== 'undefined') {
+            loginModalScheduled = false;
+        }
         StateManager.saveLoginState();
 
         if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {

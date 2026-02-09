@@ -7,6 +7,7 @@ let currentState = "DISCONNECTED";
 let savedCredentials = null;
 let loginShown = false;
 let allowLoginPrompt = false;
+let loginModalScheduled = false;
 const stateLogger = createLogger("state");
 
 // Gerenciador de estado
@@ -47,6 +48,7 @@ const StateManager = {
             savedCredentials = null;
             loginShown = false;
             allowLoginPrompt = false;
+            loginModalScheduled = false;
             stateLogger.log("Cleared session state");
         } catch (e) {
             stateLogger.error("Error clearing session state", e);
@@ -75,7 +77,7 @@ function updateConnectionState(state) {
             if (btnDisconnect) btnDisconnect.disabled = true;
             if (btnSend) btnSend.disabled = true;
             if (input) input.disabled = true;
-            if (!window.isReconnecting) {
+            if (!window.isReconnecting && window.sessionInitialized) {
                 StateManager.clearSessionState();
             }
             break;
@@ -138,6 +140,12 @@ function checkAndShowLogin() {
             sendLogin(savedCredentials.username, savedCredentials.password);
             loginShown = true;
         } else {
+            if (loginModalScheduled) {
+                stateLogger.warn("Login modal already scheduled");
+                return;
+            }
+            loginModalScheduled = true;
+            loginShown = true;
             setTimeout(() => {
                 ModalManager.showLoginModal();
             }, CONFIG.TIMEOUTS.loginModalDelay);

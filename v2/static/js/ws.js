@@ -13,11 +13,15 @@ let reconnectAttempts = 0;
 let reconnectTimeout = null;
 let isManualDisconnect = false;
 let allowReconnect = false;
+let connectRequested = false;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY_MS = 3000;
 
 // Flag para indicar reconexão
 window.isReconnecting = false;
+
+// Flag para indicar que a sessão foi inicializada (init_ok recebido)
+window.sessionInitialized = false;
 
 /**
  * Cria e conecta o WebSocket
@@ -82,8 +86,6 @@ function scheduleReconnect() {
 function handleWebSocketOpen() {
     wsLogger.log("WebSocket opened");
 
-    // Reseta contador de reconexão
-    reconnectAttempts = 0;
     if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
@@ -206,11 +208,17 @@ function handleInitOkMessage(msg) {
         hasHistory: msg.hasHistory
     });
 
+    // Reseta contador de reconexão após conexão bem-sucedida
+    reconnectAttempts = 0;
+
     // Salva o owner token recebido do servidor
     if (msg.owner) {
         StorageManager.setOwner(msg.owner);
         wsLogger.log("owner token saved");
     }
+
+    // Marca sessão como inicializada após init_ok
+    window.sessionInitialized = true;
 
     // Exibe feedback baseado no status
     if (msg.status === "created") {
@@ -230,6 +238,17 @@ function handleInitOkMessage(msg) {
         wsLogger.log("Detected reconnection with saved credentials - requesting connection");
         setTimeout(() => {
             ws.send(JSON.stringify({ type: "connect" }));
+        }, CONFIG.TIMEOUTS.backendReadyDelay);
+    }
+
+    // Se o usuário clicou em conectar antes do init_ok, envia connect agora
+    if (connectRequested && !window.isReconnecting) {
+        connectRequested = false;
+        wsLogger.log("Connect requested before init_ok - sending connect");
+        setTimeout(() => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "connect" }));
+            }
         }, CONFIG.TIMEOUTS.backendReadyDelay);
     }
 }

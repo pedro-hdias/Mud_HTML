@@ -78,7 +78,7 @@ async def websocket_endpoint(ws: WebSocket):
                 await ws.send_json({
                     "type": "init_ok",
                     "publicId": public_id,
-                    "owner": session.ownership_token,
+                    "owner": session.owner_token,
                     "status": status,
                     "hasHistory": bool(session.history)
                 })

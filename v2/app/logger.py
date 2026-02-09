@@ -2,12 +2,15 @@ import logging
 import os
 import sys
 import threading
+from datetime import datetime
 
 _LOGGER_CONFIGURED = False
+_LOG_FILE_PATH = None
 
 
 def _configure_root_logger():
     global _LOGGER_CONFIGURED
+    global _LOG_FILE_PATH
     if _LOGGER_CONFIGURED:
         return
 
@@ -24,9 +27,13 @@ def _configure_root_logger():
         log_dir = os.path.join(base_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
         
+        timestamp = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        log_filename = f"log_{timestamp}.log"
+        _LOG_FILE_PATH = os.path.join(log_dir, log_filename)
+
         # APENAS arquivo de log - nenhum output no terminal
         file_handler = logging.FileHandler(
-            os.path.join(log_dir, "app.log"), 
+            _LOG_FILE_PATH,
             encoding="utf-8",
             mode="a"  # append mode
         )
@@ -42,3 +49,8 @@ def _configure_root_logger():
 def get_logger(name):
     _configure_root_logger()
     return logging.getLogger(name)
+
+
+def get_current_log_file_path():
+    _configure_root_logger()
+    return _LOG_FILE_PATH

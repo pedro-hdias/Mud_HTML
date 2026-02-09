@@ -2,7 +2,7 @@ from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from .ws import websocket_endpoint, session_manager
-from .logger import get_logger
+from .logger import get_logger, get_current_log_file_path
 import os
 import asyncio
 import aiofiles
@@ -85,8 +85,7 @@ def logs_page():
 async def logs_stream():
     """Stream de logs em tempo real usando Server-Sent Events"""
     async def event_generator():
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        log_file = os.path.join(base_dir, "logs", "app.log")
+        log_file = get_current_log_file_path()
         
         # Envia as últimas 50 linhas primeiro
         try:
