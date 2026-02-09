@@ -9,7 +9,7 @@ const LOG_LEVELS = { debug: 0, info: 1, warn: 2, error: 3, none: 4 };
 // Nível global — pode ser alterado em runtime: LOG_LEVEL = "debug"
 // Lê da <meta name="mud-log-level"> se presente, senão usa "info"
 var LOG_LEVEL = (typeof LOG_LEVEL !== "undefined") ? LOG_LEVEL
-    : (function() {
+    : (function () {
         var el = document.querySelector('meta[name="mud-log-level"]');
         return el ? el.getAttribute("content") : "info";
     })();
