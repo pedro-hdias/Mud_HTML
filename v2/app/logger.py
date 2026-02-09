@@ -1,11 +1,31 @@
+import json
 import logging
 import os
-import sys
-import threading
-from datetime import datetime
+
+from datetime import datetime, timezone
 
 _LOGGER_CONFIGURED = False
 _LOG_FILE_PATH = None
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "function": record.funcName,
+            "line": record.lineno,
+            "thread": record.thread,
+            "message": record.getMessage(),
+        }
+
+        if record.exc_info:
+            log_entry["exception"] = self.formatException(record.exc_info)
+        if record.stack_info:
+            log_entry["stack"] = record.stack_info
+
+        return json.dumps(log_entry, ensure_ascii=False)
 
 
 def _configure_root_logger():
@@ -17,10 +37,7 @@ def _configure_root_logger():
     root_logger = logging.getLogger()
     if not root_logger.handlers:
         # Formato detalhado com tudo que acontece
-        formatter = logging.Formatter(
-            "[%(asctime)s] [%(levelname)-8s] [%(name)s:%(funcName)s:%(lineno)d] [Thread:%(thread)d] %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        formatter = JsonFormatter()
 
         # Use caminho absoluto baseado no diretório do arquivo
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
