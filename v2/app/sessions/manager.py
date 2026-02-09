@@ -9,7 +9,7 @@ from typing import Dict, Optional
 from .session import MudSession
 from .storage import SessionStorage, MemorySessionStorage
 from ..logger import get_logger
-from ..config import SESSION_TIMEOUT_MINUTES, SESSION_CLEANUP_INTERVAL_SECONDS
+from ..config import SESSION_TIMEOUT_MINUTES, SESSION_CLEANUP_INTERVAL_SECONDS, MAX_SESSIONS
 
 logger = get_logger("session_manager")
 
@@ -57,6 +57,11 @@ class SessionManager:
             self.storage.update_last_activity(public_id, datetime.now())
             return (session, "recovered", True)
         
+        # Verifica limite de sessões antes de criar nova
+        if len(self.sessions) >= MAX_SESSIONS:
+            logger.warning(f"⛔ MAX_SESSIONS reached ({MAX_SESSIONS}), rejecting new session: {public_id}")
+            return (None, "max_sessions", False)
+
         # Cria nova sessão
         logger.info(f"🆕 Creating NEW session: {public_id}")
         session = MudSession(public_id)

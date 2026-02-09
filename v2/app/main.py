@@ -1,9 +1,10 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from .ws import websocket_endpoint, session_manager
 from .logger import get_logger, get_current_log_file_path
+from .config import DEBUG_API_SECRET
 import os
 import asyncio
 import aiofiles
@@ -38,13 +39,25 @@ def index():
     return FileResponse("static/index.html")
 
 @app.get("/sessions")
-def sessions_page():
+def sessions_page(request: Request):
     """Página de debug para visualizar sessões ativas"""
+    if not _check_debug_auth(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
     return FileResponse("static/sessions.html")
 
+def _check_debug_auth(request: Request) -> bool:
+    """Verifica se o request tem autorização para acessar endpoints de debug.
+    Se DEBUG_API_SECRET estiver vazio, permite acesso (dev mode)."""
+    if not DEBUG_API_SECRET:
+        return True
+    return request.headers.get("X-Debug-Secret") == DEBUG_API_SECRET
+
+
 @app.get("/api/sessions/status")
-def sessions_status():
+def sessions_status(request: Request):
     """Retorna status das sessões ativas (útil para debug)"""
+    if not _check_debug_auth(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
     sessions_info = []
     for session_id, session in session_manager.sessions.items():
         sessions_info.append({
@@ -78,12 +91,16 @@ async def websocket_route(websocket: WebSocket):
 # ============================================================================
 
 @app.get("/logs")
-def logs_page():
+def logs_page(request: Request):
     """Página para visualizar logs em tempo real"""
+    if not _check_debug_auth(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
     return FileResponse("static/logs.html")
 
 @app.get("/api/logs/stream")
-async def logs_stream():
+async def logs_stream(request: Request):
+    if not _check_debug_auth(request):
+        return JSONResponse(status_code=403, content={"error": "Forbidden"})
     """Stream de logs em tempo real usando Server-Sent Events"""
     async def event_generator():
         log_file = get_current_log_file_path()

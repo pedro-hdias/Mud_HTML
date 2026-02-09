@@ -73,31 +73,79 @@ const StorageManager = {
         }
     },
 
+    // Ofuscação simples para não armazenar credenciais em texto puro
+    // Não é criptografia forte — impede apenas leitura casual/trivial
+    _obfuscate(text) {
+        try {
+            return btoa(text.split("").reverse().join(""));
+        } catch (e) {
+            storageLogger.error("Obfuscation error", e);
+            return btoa(text);
+        }
+    },
+
+    _deobfuscate(encoded) {
+        try {
+            return atob(encoded).split("").reverse().join("");
+        } catch (e) {
+            storageLogger.error("Deobfuscation error", e);
+            return null;
+        }
+    },
+
     // Convenientes para credenciais
     saveCredentials(username, password, persistent = false) {
-        const credentials = { username, password };
+        const credentials = {
+            u: this._obfuscate(username),
+            p: this._obfuscate(password),
+            _v: 2  // versão do formato (para migração futura)
+        };
+        const encoded = JSON.stringify(credentials);
         if (persistent) {
-            this.setCookie(CONFIG.STORAGE_KEYS.CREDENTIALS, JSON.stringify(credentials), CONFIG.COOKIE_EXPIRY_DAYS);
+            this.setCookie(CONFIG.STORAGE_KEYS.CREDENTIALS, encoded, CONFIG.COOKIE_EXPIRY_DAYS);
             this.removeItem(CONFIG.STORAGE_KEYS.CREDENTIALS);
-            storageLogger.log("Credentials saved to cookie (persistent)");
+            storageLogger.log("Credentials saved to cookie (persistent, obfuscated)");
         } else {
-            this.setItem(CONFIG.STORAGE_KEYS.CREDENTIALS, JSON.stringify(credentials));
-            storageLogger.log("Credentials saved to localStorage (session)");
+            this.setItem(CONFIG.STORAGE_KEYS.CREDENTIALS, encoded);
+            storageLogger.log("Credentials saved to localStorage (session, obfuscated)");
         }
     },
 
     getCredentials() {
         try {
+            let raw = null;
             // Tenta cookie primeiro (tem precedência)
             const cookieCreds = this.getCookie(CONFIG.STORAGE_KEYS.CREDENTIALS);
             if (cookieCreds) {
-                return JSON.parse(cookieCreds);
+                raw = JSON.parse(cookieCreds);
+            } else {
+                // Depois localStorage
+                const localCreds = this.getItem(CONFIG.STORAGE_KEYS.CREDENTIALS);
+                if (localCreds) {
+                    raw = JSON.parse(localCreds);
+                }
             }
-            // Depois localStorage
-            const localCreds = this.getItem(CONFIG.STORAGE_KEYS.CREDENTIALS);
-            if (localCreds) {
-                return JSON.parse(localCreds);
+            if (!raw) return null;
+
+            // Formato v2 (ofuscado)
+            if (raw._v === 2) {
+                const username = this._deobfuscate(raw.u);
+                const password = this._deobfuscate(raw.p);
+                if (!username || !password) {
+                    storageLogger.error("Failed to deobfuscate credentials");
+                    this.clearCredentials();
+                    return null;
+                }
+                return { username, password };
             }
+
+            // Formato legado (texto puro) — migra automaticamente
+            if (raw.username && raw.password) {
+                storageLogger.log("Migrating legacy credentials to obfuscated format");
+                this.saveCredentials(raw.username, raw.password, !!this.getCookie(CONFIG.STORAGE_KEYS.CREDENTIALS));
+                return { username: raw.username, password: raw.password };
+            }
+
             return null;
         } catch (e) {
             storageLogger.error("Error parsing credentials", e);
