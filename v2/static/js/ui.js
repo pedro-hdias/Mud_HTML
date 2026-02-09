@@ -59,8 +59,11 @@ const UIHelpers = {
         historyContainer.className = CONFIG.CLASSES.historyBlock;
 
         const lines = content.split(/\r?\n/);
-        lines.forEach((line, idx) => {
-            if (line || idx < lines.length - 1) {
+        const maxHistoryLines = CONFIG.OUTPUT_HISTORY_MAX_LINES || CONFIG.OUTPUT_MAX_LINES;
+        const startIndex = Math.max(0, lines.length - maxHistoryLines);
+
+        lines.slice(startIndex).forEach((line, idx, arr) => {
+            if (line || idx < arr.length - 1) {
                 const lineEl = document.createElement("div");
                 lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.history}`;
                 lineEl.textContent = line;

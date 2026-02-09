@@ -194,7 +194,7 @@ const EventManager = {
         StateManager.saveLoginState();
 
         if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "connect" }));
+            sendMessage("connect");
         } else if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.CONNECTING) {
             eventsLogger.log("WebSocket is connecting, waiting for connection");
         } else {
@@ -214,7 +214,7 @@ const EventManager = {
         StateStore.setAllowReconnect(false);
 
         if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "disconnect" }));
+            sendMessage("disconnect");
         }
         StateStore.setAllowLoginPrompt(false);
         StateStore.setLoginShown(false);

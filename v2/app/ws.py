@@ -1,12 +1,13 @@
 import asyncio
-import json
 from fastapi import WebSocket, WebSocketDisconnect
 from .mud.state import ConnectionState, log_state_read
 from .sessions import SessionManager
 from .logger import get_logger
+from .config import SESSION_TIMEOUT_MINUTES, SESSION_REMOVAL_DELAY_SECONDS, MUD_QUIT_GRACE_SECONDS
+from .ws_messages import make_message, parse_message
 
 # Gerenciador global de sessões
-session_manager = SessionManager(session_timeout_minutes=10)
+session_manager = SessionManager(session_timeout_minutes=SESSION_TIMEOUT_MINUTES)
 logger = get_logger("ws")
 
 
@@ -22,19 +23,23 @@ async def websocket_endpoint(ws: WebSocket):
         # Aguarda mensagem inicial com publicId
         msg = await ws.receive_text()
         logger.debug(f"Received initial message: {msg}")
-        
+
         try:
-            data = json.loads(msg)
-            msg_type = data.get("type")
+            parsed = parse_message(msg)
+            if not parsed:
+                raise ValueError("invalid_json")
+
+            msg_type = parsed.get("type")
+            payload = parsed.get("payload") or {}
             
             if msg_type == "init":
                 # Cliente enviou publicId (e opcionalmente owner)
-                public_id = data.get("publicId")
-                ownership_token = data.get("owner")
+                public_id = payload.get("publicId")
+                ownership_token = payload.get("owner")
                 
                 if not public_id:
                     logger.error("No publicId provided in init message")
-                    await ws.send_json({"type": "error", "message": "publicId obrigatório"})
+                    await ws.send_json(make_message("error", {"message": "publicId obrigatório"}))
                     return
                 
                 logger.info(f"Client initialized with publicId: {public_id}")
@@ -53,11 +58,10 @@ async def websocket_endpoint(ws: WebSocket):
                     else:
                         error_msg = "Sessão inválida. Gerando nova sessão..."
                     
-                    await ws.send_json({
-                        "type": "session_invalid",
+                    await ws.send_json(make_message("session_invalid", {
                         "reason": status,
                         "message": error_msg
-                    })
+                    }))
                     await ws.close(code=4003, reason=status)
                     return
                 
@@ -66,40 +70,43 @@ async def websocket_endpoint(ws: WebSocket):
                 
                 # Envia o estado atual ao cliente
                 log_state_read(session.state, f"send_state_to_client_{public_id}")
-                await ws.send_json({"type": "state", "value": session.state.value})
+                await ws.send_json(make_message("state", {"value": session.state.value}))
                 logger.debug(f"Sent current state to client: {session.state.value}")
                 
                 # Envia o histórico se existir
                 if session.history:
                     logger.debug(f"Sending history to client ({len(session.history)} chars)")
-                    await ws.send_json({"type": "history", "content": session.history})
+                    await ws.send_json(make_message("history", {"content": session.history}))
                 
                 # Confirma inicialização com ownership token
-                await ws.send_json({
-                    "type": "init_ok",
+                await ws.send_json(make_message("init_ok", {
                     "publicId": public_id,
                     "owner": session.owner_token,
                     "status": status,
                     "hasHistory": bool(session.history)
-                })
+                }))
             else:
                 logger.error(f"Expected 'init' message, got '{msg_type}'")
-                await ws.send_json({"type": "error", "message": "Primeiro envie mensagem 'init'"})
+                await ws.send_json(make_message("error", {"message": "Primeiro envie mensagem 'init'"}))
                 return
         
-        except json.JSONDecodeError:
+        except ValueError:
             logger.error("Invalid JSON in initial message")
-            await ws.send_json({"type": "error", "message": "JSON inválido"})
+            await ws.send_json(make_message("error", {"message": "JSON inválido"}))
             return
         
         # Loop de mensagens
         while True:
             msg = await ws.receive_text()
             logger.debug(f"Session {public_id}: Received message")
-            
+
             try:
-                data = json.loads(msg)
-                msg_type = data.get("type")
+                parsed = parse_message(msg)
+                if not parsed:
+                    raise ValueError("invalid_json")
+
+                msg_type = parsed.get("type")
+                payload = parsed.get("payload") or {}
                 
                 if msg_type == "connect":
                     # Cliente solicitou conexão ao MUD
@@ -112,7 +119,7 @@ async def websocket_endpoint(ws: WebSocket):
                         else:
                             await session.broadcast_state(ConnectionState.DISCONNECTED)
                             logger.debug(f"Session {public_id}: MUD connection failed")
-                            await ws.send_json({"type": "system", "message": "Falha ao conectar no servidor"})
+                            await ws.send_json(make_message("system", {"message": "Falha ao conectar no servidor"}))
                 
                 elif msg_type == "disconnect":
                     # Cliente solicitou desconexão do MUD
@@ -129,18 +136,18 @@ async def websocket_endpoint(ws: WebSocket):
                         except:
                             logger.exception(f"Session {public_id}: Failed to send quit to MUD")
                         # Aguarda um momento para o servidor processar
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(MUD_QUIT_GRACE_SECONDS)
                         await session.disconnect_from_mud()
                         
                         # Agenda remoção da sessão após 30 segundos
-                        asyncio.create_task(session_manager.schedule_session_removal(public_id, delay_seconds=30))
+                        asyncio.create_task(session_manager.schedule_session_removal(public_id, delay_seconds=SESSION_REMOVAL_DELAY_SECONDS))
                 
                 elif msg_type == "login":
                     # Cliente enviou credenciais de login
                     log_state_read(session.state, f"login_request_{public_id}")
                     if session.socket and session.state in [ConnectionState.CONNECTED, ConnectionState.AWAITING_LOGIN]:
-                        username = data.get("username", "")
-                        password = data.get("password", "")
+                        username = payload.get("username", "")
+                        password = payload.get("password", "")
                         
                         # Envia sequência de login
                         try:
@@ -157,11 +164,11 @@ async def websocket_endpoint(ws: WebSocket):
                     # Cliente enviou comando normal
                     log_state_read(session.state, f"command_request_{public_id}")
                     if session.socket and session.state == ConnectionState.CONNECTED:
-                        command = data.get("value", "")
+                        command = payload.get("value", "")
                         logger.debug(f"Session {public_id}: Sending command to MUD")
                         session.send_to_mud((command + "\n").encode())
             
-            except json.JSONDecodeError:
+            except ValueError:
                 # Mensagem não é JSON, trata como comando direto (backward compatibility)
                 log_state_read(session.state, f"raw_command_{public_id}")
                 if session.socket and session.state == ConnectionState.CONNECTED:

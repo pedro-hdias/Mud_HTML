@@ -5,7 +5,15 @@
 
 const CONFIG = {
     // URLs e endpoints
-    WS_URL: `ws://${location.host}/ws`,
+    WS: {
+        url: `ws://${location.host}/ws`,
+        reconnectMaxAttempts: 5,
+        reconnectDelayMs: 3000,
+        backendReadyDelayMs: 500,
+        messageMeta: {
+            client: "web"
+        }
+    },
 
     // Chaves de armazenamento
     STORAGE_KEYS: {
@@ -70,12 +78,12 @@ const CONFIG = {
     // Timeouts
     TIMEOUTS: {
         loginModalDelay: 500,
-        reconnectDelay: 1000,
-        backendReadyDelay: 500
+        reconnectDelay: 1000
     },
 
     // Output
     OUTPUT_MAX_LINES: 2000,
+    OUTPUT_HISTORY_MAX_LINES: 2000,
 
     // Cookie config
     COOKIE_EXPIRY_DAYS: 30

@@ -4,7 +4,7 @@
  */
 
 const wsLogger = createLogger("ws");
-const wsUrl = CONFIG.WS_URL;
+const wsUrl = CONFIG.WS.url;
 
 // Estado da conexão
 let ws = null;
@@ -12,10 +12,57 @@ let lastCommandSent = "";
 let reconnectAttempts = 0;
 let reconnectTimeout = null;
 let isManualDisconnect = false;
-const MAX_RECONNECT_ATTEMPTS = 5;
-const RECONNECT_DELAY_MS = 3000;
+const MAX_RECONNECT_ATTEMPTS = CONFIG.WS.reconnectMaxAttempts;
+const RECONNECT_DELAY_MS = CONFIG.WS.reconnectDelayMs;
 
 // Flags de reconexão e sessão ficam no StateStore
+
+function buildMessage(type, payload = {}, meta = {}) {
+    return {
+        type,
+        payload,
+        meta: {
+            ...(CONFIG.WS.messageMeta || {}),
+            ...meta
+        }
+    };
+}
+
+function parseMessage(raw) {
+    try {
+        const data = JSON.parse(raw);
+        const type = data.type;
+        let payload = data.payload;
+        const meta = data.meta || {};
+
+        if (!payload) {
+            payload = {};
+            ["publicId", "owner", "value", "content", "message", "username", "password", "reason"].forEach(key => {
+                if (data[key] !== undefined) {
+                    payload[key] = data[key];
+                }
+            });
+        }
+
+        return { type, payload, meta };
+    } catch (e) {
+        wsLogger.error("Invalid WS message", e, raw);
+        return null;
+    }
+}
+
+function sendMessage(type, payload = {}, meta = {}) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        wsLogger.error("Cannot send message - WebSocket not connected", type);
+        return false;
+    }
+
+    ws.send(JSON.stringify(buildMessage(type, payload, {
+        clientTs: Date.now(),
+        ...meta
+    })));
+    return true;
+}
 
 
 /**
@@ -92,16 +139,10 @@ function handleWebSocketOpen() {
     wsLogger.log("Initializing session", { publicId, hasToken: !!owner });
 
     // Envia mensagem de inicialização (com token se existir)
-    const initMsg = {
-        type: "init",
-        publicId: publicId
-    };
-
-    if (owner) {
-        initMsg.owner = owner;
-    }
-
-    ws.send(JSON.stringify(initMsg));
+    sendMessage("init", {
+        publicId: publicId,
+        owner: owner || null
+    });
 }
 
 /**
@@ -110,29 +151,30 @@ function handleWebSocketOpen() {
 function handleWebSocketMessage(event) {
     try {
         wsLogger.log("WebSocket message received", event.data);
-        const msg = JSON.parse(event.data);
+        const msg = parseMessage(event.data);
+        if (!msg) return;
 
         switch (msg.type) {
             case "init_ok":
-                handleInitOkMessage(msg);
+                handleInitOkMessage(msg.payload || {});
                 break;
             case "session_invalid":
-                handleSessionInvalidMessage(msg);
+                handleSessionInvalidMessage(msg.payload || {});
                 break;
             case "state":
-                handleStateMessage(msg);
+                handleStateMessage(msg.payload || {});
                 break;
             case "history":
-                handleHistoryMessage(msg);
+                handleHistoryMessage(msg.payload || {});
                 break;
             case "line":
-                handleLineMessage(msg);
+                handleLineMessage(msg.payload || {});
                 break;
             case "system":
-                handleSystemMessage(msg);
+                handleSystemMessage(msg.payload || {});
                 break;
             case "error":
-                handleErrorMessage(msg);
+                handleErrorMessage(msg.payload || {});
                 break;
             default:
                 wsLogger.warn("Unknown message type", msg.type);
@@ -188,19 +230,19 @@ function handleWebSocketClose(event) {
 
 // ===== Message Handlers =====
 
-function handleInitOkMessage(msg) {
+function handleInitOkMessage(payload) {
     wsLogger.log("Session initialized", {
-        publicId: msg.publicId,
-        status: msg.status,
-        hasHistory: msg.hasHistory
+        publicId: payload.publicId,
+        status: payload.status,
+        hasHistory: payload.hasHistory
     });
 
     // Reseta contador de reconexão após conexão bem-sucedida
     reconnectAttempts = 0;
 
     // Salva o owner token recebido do servidor
-    if (msg.owner) {
-        StorageManager.setOwner(msg.owner);
+    if (payload.owner) {
+        StorageManager.setOwner(payload.owner);
         wsLogger.log("owner token saved");
     }
 
@@ -208,9 +250,9 @@ function handleInitOkMessage(msg) {
     StateStore.setSessionInitialized(true);
 
     // Exibe feedback baseado no status
-    if (msg.status === "created") {
+    if (payload.status === "created") {
         wsLogger.log("New session created");
-    } else if (msg.status === "recovered") {
+    } else if (payload.status === "recovered") {
         wsLogger.log("Session recovered successfully");
         UIHelpers.appendSystemMessage("[SISTEMA] Sessão recuperada com sucesso!", "#4CAF50");
     }
@@ -220,8 +262,8 @@ function handleInitOkMessage(msg) {
     if (savedCredentials && StateStore.isReconnecting()) {
         wsLogger.log("Detected reconnection with saved credentials - requesting connection");
         setTimeout(() => {
-            ws.send(JSON.stringify({ type: "connect" }));
-        }, CONFIG.TIMEOUTS.backendReadyDelay);
+            sendMessage("connect");
+        }, CONFIG.WS.backendReadyDelayMs);
     }
 
     // Se o usuário clicou em conectar antes do init_ok, envia connect agora
@@ -230,57 +272,59 @@ function handleInitOkMessage(msg) {
         wsLogger.log("Connect requested before init_ok - sending connect");
         setTimeout(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: "connect" }));
+                sendMessage("connect");
             }
-        }, CONFIG.TIMEOUTS.backendReadyDelay);
+        }, CONFIG.WS.backendReadyDelayMs);
     }
 }
 
-function handleSessionInvalidMessage(msg) {
+function handleSessionInvalidMessage(payload) {
     wsLogger.error("Session invalidated by server", {
-        reason: msg.reason,
-        message: msg.message
+        reason: payload.reason,
+        message: payload.message
     });
 
-    UIHelpers.appendSystemMessage(`[SISTEMA] ${msg.message}`, "orange");
+    UIHelpers.appendSystemMessage(`[SISTEMA] ${payload.message}`, "orange");
 
     // O WebSocket será fechado pelo servidor com código 4003
     // O handler onclose cuidará da limpeza e reconexão
 }
 
-function handleStateMessage(msg) {
-    updateConnectionState(msg.value);
+function handleStateMessage(payload) {
+    updateConnectionState(payload.value);
 }
 
-function handleErrorMessage(msg) {
-    wsLogger.error("Server error", msg.message);
-    UIHelpers.appendSystemMessage("[ERRO] " + msg.message, "red");
+function handleErrorMessage(payload) {
+    wsLogger.error("Server error", payload.message);
+    UIHelpers.appendSystemMessage("[ERRO] " + payload.message, "red");
 }
 
-function handleHistoryMessage(msg) {
-    UIHelpers.appendHistoryBlock(msg.content);
+function handleHistoryMessage(payload) {
+    UIHelpers.appendHistoryBlock(payload.content || "");
 
-    if (msg.content && StateStore.isReconnecting()) {
+    if (payload.content && StateStore.isReconnecting()) {
         wsLogger.log("History received during reconnection - session active");
     }
 }
 
-function handleLineMessage(msg) {
+function handleLineMessage(payload) {
     const output = getElement(CONFIG.SELECTORS.output);
     if (!output) return;
 
+    if (!payload.content) return;
+
     // Tenta processar como parte de um menu interativo
-    const isMenuLine = MenuManager.processLine(msg.content, output);
+    const isMenuLine = MenuManager.processLine(payload.content, output);
 
     // Se não for linha de menu, processa normalmente
     if (!isMenuLine) {
-        UIHelpers.appendOutputLine(msg.content.trimEnd());
+        UIHelpers.appendOutputLine(payload.content.trimEnd());
     }
 
-    PromptDetector.setLastLine(msg.content);
+    PromptDetector.setLastLine(payload.content);
 
     // Detecta quando o servidor está aguardando input/login
-    const lineText = msg.content.toLowerCase();
+    const lineText = payload.content.toLowerCase();
     const hasInputPrompt = lineText.includes("[input]") ||
         lineText.includes("name:") ||
         lineText.includes("login:") ||
@@ -293,14 +337,14 @@ function handleLineMessage(msg) {
     }
 
     // Verifica se é um prompt de confirmação (apenas se não for menu)
-    if (!isMenuLine && PromptDetector.shouldShowConfirmPrompt(msg.content)) {
-        const promptMessage = PromptDetector.buildConfirmMessage(msg.content);
+    if (!isMenuLine && PromptDetector.shouldShowConfirmPrompt(payload.content)) {
+        const promptMessage = PromptDetector.buildConfirmMessage(payload.content);
         showConfirmModal(promptMessage);
     }
 }
 
-function handleSystemMessage(msg) {
-    UIHelpers.appendSystemMessage("[SISTEMA] " + msg.message);
+function handleSystemMessage(payload) {
+    UIHelpers.appendSystemMessage("[SISTEMA] " + payload.message);
 }
 
 // ===== Funkcionalidade: Dividir comandos por `;` =====
@@ -329,10 +373,7 @@ function sendCommand(commandText) {
     for (const command of commands) {
         lastCommandSent = command;
         wsLogger.log("Sending command", command);
-        ws.send(JSON.stringify({
-            type: "command",
-            value: command
-        }));
+        sendMessage("command", { value: command });
     }
 }
 
@@ -353,10 +394,9 @@ function sendLogin(username, password) {
     }
 
     wsLogger.log("Sending login");
-    ws.send(JSON.stringify({
-        type: "login",
+    sendMessage("login", {
         username: username,
         password: password
-    }));
+    });
 }
 

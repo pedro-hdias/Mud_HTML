@@ -11,7 +11,15 @@ from fastapi import WebSocket
 
 from ..mud.state import ConnectionState, log_state_change, log_state_read
 from ..mud import parser
-from ..config import MUD_HOST, MUD_PORT
+from ..config import (
+    MUD_HOST,
+    MUD_PORT,
+    MUD_READ_BUFFER_SIZE,
+    MUD_IDLE_SLEEP_SECONDS,
+    HISTORY_MAX_BYTES,
+    HISTORY_MAX_LINES
+)
+from ..ws_messages import make_message
 from ..logger import get_logger
 
 logger = get_logger("session")
@@ -60,7 +68,7 @@ class MudSession:
         self.state = state
         log_state_change(previous_state, state, f"session_{self.public_id}")
         
-        message = {"type": "state", "value": state.value}
+        message = make_message("state", {"value": state.value})
         disconnected_clients = []
         
         for ws in list(self.websocket_clients):
@@ -127,7 +135,7 @@ class MudSession:
                 logger.exception(f"Session {self.public_id}: Socket send failed: {e}")
                 raise
     
-    def receive_from_mud(self, buffer_size=4096) -> bytes:
+    def receive_from_mud(self, buffer_size=MUD_READ_BUFFER_SIZE) -> bytes:
         """Recebe dados do MUD"""
         if self.socket:
             try:
@@ -145,6 +153,20 @@ class MudSession:
                 logger.exception(f"Session {self.public_id}: Socket receive failed: {e}")
                 raise
         return None
+
+    def _append_history(self, text: str):
+        if not text:
+            return
+
+        self.history += text
+
+        if HISTORY_MAX_BYTES and len(self.history) > HISTORY_MAX_BYTES:
+            self.history = self.history[-HISTORY_MAX_BYTES:]
+
+        if HISTORY_MAX_LINES:
+            lines = self.history.splitlines(keepends=True)
+            if len(lines) > HISTORY_MAX_LINES:
+                self.history = "".join(lines[-HISTORY_MAX_LINES:])
     
     async def disconnect_from_mud(self):
         """Desconecta do MUD e limpa recursos"""
@@ -182,10 +204,9 @@ class MudSession:
                     # Socket fechado pelo servidor
                     logger.debug(f"Session {self.public_id}: MUD socket closed by server")
                     await self.disconnect_from_mud()
-                    await self.broadcast_message({
-                        "type": "system",
+                    await self.broadcast_message(make_message("system", {
                         "message": "Conexão encerrada pelo servidor"
-                    })
+                    }))
                     break
                 
                 # Reseta contador de erros ao receber dados com sucesso
@@ -194,7 +215,7 @@ class MudSession:
                 text = data.decode(errors="ignore")
                 logger.debug(f"Session {self.public_id}: Received MUD data chunk: {len(text)} chars")
                 self.partial_buffer += text
-                self.history += text
+                self._append_history(text)
                 
                 # Processa linhas completas (delimitadas por \n ou \r\n)
                 while "\n" in self.partial_buffer:
@@ -209,30 +230,28 @@ class MudSession:
                     # Detecta desconexão pelo padrão "*** Disconnected ***"
                     if parser.detect_disconnection(line):
                         # Envia a linha primeiro
-                        await self.broadcast_message({"type": "line", "content": line})
+                        await self.broadcast_message(make_message("line", {"content": line}))
                         
                         # Depois desconecta
                         await self.disconnect_from_mud()
-                        await self.broadcast_message({
-                            "type": "system",
+                        await self.broadcast_message(make_message("system", {
                             "message": "Desconectado do servidor"
-                        })
+                        }))
                         return
                     
                     # Envia cada linha completa como um evento separado
-                    await self.broadcast_message({"type": "line", "content": line})
+                    await self.broadcast_message(make_message("line", {"content": line}))
             
             except BlockingIOError:
                 # BlockingIOError não é um erro - é normal quando não há dados disponíveis
                 # O servidor pode estar aguardando input do usuário (menu, prompt, etc)
                 # Não incrementa o contador de erros
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(MUD_IDLE_SLEEP_SECONDS)
             except Exception as e:
                 logger.exception(f"Session {self.public_id}: Error reading from MUD: {e}")
                 await self.disconnect_from_mud()
-                await self.broadcast_message({
-                    "type": "system",
+                await self.broadcast_message(make_message("system", {
                     "message": f"Erro de conexão: {e}"
-                })
+                }))
                 break
 

@@ -9,6 +9,7 @@ from typing import Dict, Optional
 from .session import MudSession
 from .storage import SessionStorage, MemorySessionStorage
 from ..logger import get_logger
+from ..config import SESSION_TIMEOUT_MINUTES, SESSION_CLEANUP_INTERVAL_SECONDS
 
 logger = get_logger("session_manager")
 
@@ -16,7 +17,7 @@ logger = get_logger("session_manager")
 class SessionManager:
     """Gerenciador de sessões MUD"""
     
-    def __init__(self, storage: Optional[SessionStorage] = None, session_timeout_minutes: int = 10):
+    def __init__(self, storage: Optional[SessionStorage] = None, session_timeout_minutes: int = SESSION_TIMEOUT_MINUTES):
         self.storage = storage or MemorySessionStorage()
         self.sessions: Dict[str, MudSession] = {}
         self.session_timeout = timedelta(minutes=session_timeout_minutes)
@@ -128,7 +129,7 @@ class SessionManager:
         """Loop de limpeza periódica"""
         while True:
             try:
-                await asyncio.sleep(60)  # Verifica a cada 1 minuto
+                await asyncio.sleep(SESSION_CLEANUP_INTERVAL_SECONDS)
                 await self.cleanup_inactive_sessions()
             except asyncio.CancelledError:
                 break
