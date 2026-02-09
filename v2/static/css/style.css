@@ -188,6 +188,17 @@ body {
     cursor: not-allowed;
 }
 
+/* Flash visual ao enviar comando */
+#input.input-flash {
+    background: #1a3a1a;
+    transition: background 0.1s ease-in;
+}
+
+/* Cores ANSI no output */
+#output span {
+    /* herda font e line-height do pai */
+}
+
 /* Botão de envio */
 #btnSend {
     padding: 12px 20px;

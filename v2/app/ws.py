@@ -1,17 +1,23 @@
 import asyncio
 import time
 from fastapi import WebSocket, WebSocketDisconnect
-from .mud.state import ConnectionState, log_state_read
+from .mud.state import log_state_read
 from .sessions import SessionManager
 from .logger import get_logger
 from .config import (
     SESSION_TIMEOUT_MINUTES,
-    SESSION_REMOVAL_DELAY_SECONDS,
-    MUD_QUIT_GRACE_SECONDS,
     WS_RATE_LIMIT_MAX_MESSAGES,
     WS_RATE_LIMIT_WINDOW_SECONDS,
+    WS_CLOSE_CODES,
 )
 from .ws_messages import make_message, parse_message
+from .ws_handlers import (
+    handle_connect,
+    handle_disconnect,
+    handle_login,
+    handle_command,
+    handle_raw_command,
+)
 
 # Gerenciador global de sessões
 session_manager = SessionManager(session_timeout_minutes=SESSION_TIMEOUT_MINUTES)
@@ -67,7 +73,7 @@ async def websocket_endpoint(ws: WebSocket):
                     else:
                         error_msg = "Sessão inválida. Gerando nova sessão..."
                     
-                    close_code = 4008 if status == "max_sessions" else 4003
+                    close_code = WS_CLOSE_CODES["max_sessions"] if status == "max_sessions" else WS_CLOSE_CODES["session_invalid"]
                     await ws.send_json(make_message("session_invalid", {
                         "reason": status,
                         "message": error_msg
@@ -131,77 +137,20 @@ async def websocket_endpoint(ws: WebSocket):
                 payload = parsed.get("payload") or {}
                 
                 if msg_type == "connect":
-                    # Cliente solicitou conexão ao MUD
-                    log_state_read(session.state, f"connect_request_{public_id}")
-                    if session.state == ConnectionState.DISCONNECTED:
-                        await session.broadcast_state(ConnectionState.CONNECTING)
-                        if await session.connect_to_mud():
-                            await session.broadcast_state(ConnectionState.CONNECTED)
-                            session.reader_task = asyncio.create_task(session.mud_reader())
-                        else:
-                            await session.broadcast_state(ConnectionState.DISCONNECTED)
-                            logger.debug(f"Session {public_id}: MUD connection failed")
-                            await ws.send_json(make_message("system", {"message": "Falha ao conectar no servidor"}))
+                    await handle_connect(session, ws, public_id, session_manager)
                 
                 elif msg_type == "disconnect":
-                    # Cliente solicitou desconexão do MUD
-                    log_state_read(session.state, f"disconnect_request_{public_id}")
-                    if session.state != ConnectionState.DISCONNECTED and session.writer:
-                        # Marca como desconexão manual (invalida sessão)
-                        session.manual_disconnect = True
-                        logger.info(f"Session {public_id}: Marked as manual disconnect")
-                        
-                        # Envia comando quit
-                        try:
-                            logger.debug(f"Session {public_id}: Sending quit to MUD")
-                            await session.send_to_mud(b"quit\n")
-                        except:
-                            logger.exception(f"Session {public_id}: Failed to send quit to MUD")
-                        # Aguarda um momento para o servidor processar
-                        await asyncio.sleep(MUD_QUIT_GRACE_SECONDS)
-                        await session.disconnect_from_mud()
-                        
-                        # Agenda remoção da sessão após 30 segundos
-                        asyncio.create_task(session_manager.schedule_session_removal(public_id, delay_seconds=SESSION_REMOVAL_DELAY_SECONDS))
+                    await handle_disconnect(session, ws, public_id, session_manager)
                 
                 elif msg_type == "login":
-                    # Cliente enviou credenciais de login
-                    log_state_read(session.state, f"login_request_{public_id}")
-                    if session.writer and session.state in [ConnectionState.CONNECTED, ConnectionState.AWAITING_LOGIN]:
-                        username = payload.get("username", "")
-                        password = payload.get("password", "")
-                        
-                        # Envia sequência de login
-                        try:
-                            logger.debug(f"Session {public_id}: Sending login sequence to MUD")
-                            await session.send_to_mud(b"p\n")
-                            await asyncio.sleep(0.1)
-                            await session.send_to_mud((username + "\n").encode())
-                            await asyncio.sleep(0.1)
-                            await session.send_to_mud((password + "\n").encode())
-                        except Exception as e:
-                            logger.exception(f"Session {public_id}: Error sending login: {e}")
+                    await handle_login(session, ws, public_id, payload)
                 
                 elif msg_type == "command":
-                    # Cliente enviou comando normal
-                    log_state_read(session.state, f"command_request_{public_id}")
-                    if session.writer and session.state == ConnectionState.CONNECTED:
-                        command = payload.get("value", "")
-                        
-                        # Validação de tamanho para segurança (evitar buffer overflow no servidor MUD)
-                        if len(command) > 512:
-                            logger.warning(f"Session {public_id}: Command too long ({len(command)} chars), truncated")
-                            command = command[:512]
-                            
-                        logger.debug(f"Session {public_id}: Sending command to MUD")
-                        await session.send_to_mud((command + "\n").encode())
+                    await handle_command(session, ws, public_id, payload)
             
             except ValueError:
                 # Mensagem não é JSON, trata como comando direto (backward compatibility)
-                log_state_read(session.state, f"raw_command_{public_id}")
-                if session.writer and session.state == ConnectionState.CONNECTED:
-                    logger.debug(f"Session {public_id}: Sending raw command to MUD")
-                    await session.send_to_mud((msg + "\n").encode())
+                await handle_raw_command(session, public_id, msg)
     
     except WebSocketDisconnect as e:
         logger.info(f"Session {public_id}: WebSocket disconnected (code: {e.code})")

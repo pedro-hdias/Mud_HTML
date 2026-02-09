@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from .ws import websocket_endpoint, session_manager
 from .logger import get_logger, get_current_log_file_path
-from .config import DEBUG_API_SECRET
+from .config import DEBUG_API_SECRET, WS_CLOSE_CODES
 import os
 import asyncio
 import aiofiles
@@ -82,9 +82,22 @@ async def websocket_route(websocket: WebSocket):
     except Exception as e:
         logger.exception(f"WebSocket error during handshake: {e}")
         try:
-            await websocket.close(code=1011, reason="Internal server error")
+            await websocket.close(code=WS_CLOSE_CODES["internal_error"], reason="Internal server error")
         except:
             pass
+
+# ============================================================================
+# HEALTH CHECK
+# ============================================================================
+
+@app.get("/health")
+def health_check():
+    """Health check público — utilizado por Docker HEALTHCHECK e monitores."""
+    return {
+        "status": "ok",
+        "sessions": session_manager.get_session_count(),
+        "clients": session_manager.get_active_client_count()
+    }
 
 # ============================================================================
 # LOG VIEWER - COMPLETAMENTE REMOVÍVEL (remover este bloco quando não precisar)

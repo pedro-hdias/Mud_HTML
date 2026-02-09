@@ -9,6 +9,11 @@ const EventManager = {
     initialized: false,
     _abortController: null,
 
+    // UX: Histórico de comandos (setas ↑/↓)
+    _commandHistory: [],
+    _historyIndex: -1,
+    _savedInput: "",
+
     init() {
         if (this.initialized) return;
 
@@ -93,8 +98,56 @@ const EventManager = {
             if (e.key === "Enter") {
                 e.preventDefault();
                 this.handleSendClick();
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                this._navigateHistory(input, -1);
+            } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                this._navigateHistory(input, 1);
             }
         }, { signal: this._abortController.signal });
+    },
+
+    /**
+     * Navega pelo histórico de comandos.
+     * direction: -1 para trás (↑), +1 para frente (↓)
+     */
+    _navigateHistory(input, direction) {
+        if (this._commandHistory.length === 0) return;
+
+        // Salva o input atual se estamos começando a navegar
+        if (this._historyIndex === -1 && direction === -1) {
+            this._savedInput = input.value;
+        }
+
+        const newIndex = this._historyIndex + (-direction); // -1 sobe no array
+        if (newIndex < 0 || newIndex >= this._commandHistory.length) {
+            if (direction === 1) {
+                // Voltou ao fim: restaura input salvo
+                this._historyIndex = -1;
+                input.value = this._savedInput;
+            }
+            return;
+        }
+
+        this._historyIndex = newIndex;
+        input.value = this._commandHistory[newIndex];
+        // Posiciona cursor no final
+        input.setSelectionRange(input.value.length, input.value.length);
+    },
+
+    /**
+     * Adiciona comando ao histórico.
+     */
+    _pushCommandHistory(command) {
+        if (!command) return;
+        // Evita duplicatas consecutivas
+        if (this._commandHistory.length > 0 && this._commandHistory[0] === command) return;
+        this._commandHistory.unshift(command);
+        if (this._commandHistory.length > (CONFIG.COMMAND_HISTORY_MAX || 50)) {
+            this._commandHistory.pop();
+        }
+        this._historyIndex = -1;
     },
 
     bindLoginFormEvents() {
@@ -273,9 +326,11 @@ const EventManager = {
         const command = input.value.trim();
         if (command) {
             eventsLogger.log("Sending command", command);
+            this._pushCommandHistory(command);
             sendCommand(command);
             input.value = "";
             input.focus();
+            UIHelpers.flashInput();
             return;
         }
 
@@ -285,6 +340,8 @@ const EventManager = {
                 eventsLogger.log("Resending last command", lastCommand);
                 sendCommand(lastCommand);
                 input.focus();
+                UIHelpers.flashInput();
+                UIHelpers.appendSystemMessage(`[reenvio] ${lastCommand}`, "#888");
                 return;
             }
         }

@@ -67,6 +67,9 @@ function sendMessage(type, payload = {}, meta = {}) {
     return true;
 }
 
+// UX: Latência — timestamp do último envio para medir round-trip
+let _lastSendTimestamp = 0;
+
 
 /**
  * Cria e conecta o WebSocket
@@ -155,6 +158,7 @@ function handleWebSocketOpen() {
     wsLogger.log("Initializing session", { publicId, hasToken: !!owner });
 
     // Envia mensagem de inicialização (com token se existir)
+    _lastSendTimestamp = Date.now();
     sendMessage("init", {
         publicId: publicId,
         owner: owner || null
@@ -258,6 +262,14 @@ function handleInitOkMessage(payload) {
         status: payload.status,
         hasHistory: payload.hasHistory
     });
+
+    // Mede latência round-trip (init -> init_ok)
+    if (_lastSendTimestamp > 0) {
+        const latency = Date.now() - _lastSendTimestamp;
+        _lastSendTimestamp = 0;
+        wsLogger.log("Latency (round-trip)", latency, "ms");
+        UIHelpers.showLatency(latency);
+    }
 
     // Reseta contador de reconexão após conexão bem-sucedida
     reconnectAttempts = 0;

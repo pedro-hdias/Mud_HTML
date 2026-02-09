@@ -6,6 +6,71 @@
 
 const uiLogger = createLogger("ui");
 
+/**
+ * Mapa de códigos ANSI SGR para cores CSS.
+ * Suporta cores padrão (30–37, 90–97) e reset (0).
+ */
+const ANSI_COLOR_MAP = {
+    "30": "#000", "31": "#c00", "32": "#0a0", "33": "#ca0",
+    "34": "#44f", "35": "#c0c", "36": "#0cc", "37": "#ccc",
+    "90": "#666", "91": "#f66", "92": "#6f6", "93": "#ff6",
+    "94": "#66f", "95": "#f6f", "96": "#6ff", "97": "#fff"
+};
+
+/**
+ * Converte texto com códigos ANSI em fragmento DOM com <span style="color:...">.
+ * Retorna o DocumentFragment pronto para appendChild.
+ */
+function parseAnsiToFragment(text) {
+    // Regex para sequências ANSI CSI SGR: ESC[ ... m
+    const ansiRegex = /\x1b\[(\d+(?:;\d+)*)m/g;
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let currentColor = null;
+    let match;
+
+    while ((match = ansiRegex.exec(text)) !== null) {
+        // Texto antes da sequência
+        if (match.index > lastIndex) {
+            const span = document.createElement("span");
+            if (currentColor) span.style.color = currentColor;
+            span.textContent = text.slice(lastIndex, match.index);
+            fragment.appendChild(span);
+        }
+
+        // Processa os códigos SGR
+        const codes = match[1].split(";");
+        for (const code of codes) {
+            if (code === "0" || code === "") {
+                currentColor = null; // reset
+            } else if (ANSI_COLOR_MAP[code]) {
+                currentColor = ANSI_COLOR_MAP[code];
+            }
+            // Ignora bold (1), underline (4), etc. silenciosamente
+        }
+        lastIndex = match.index + match[0].length;
+    }
+
+    // Texto restante
+    if (lastIndex < text.length) {
+        const span = document.createElement("span");
+        if (currentColor) span.style.color = currentColor;
+        span.textContent = text.slice(lastIndex);
+        fragment.appendChild(span);
+    }
+
+    // Se não tinha nenhum ANSI, retorna null para usar textContent (mais rápido)
+    if (fragment.childNodes.length === 0) return null;
+    return fragment;
+}
+
+/**
+ * Detecta se o texto contém sequências ANSI
+ */
+function hasAnsiCodes(text) {
+    return text.includes("\x1b[");
+}
+
 const UIHelpers = {
     _scrollRafId: null,
 
@@ -62,7 +127,19 @@ const UIHelpers = {
             classNames.push(CONFIG.CLASSES.new);
         }
         lineEl.className = classNames.join(" ");
-        lineEl.textContent = text;
+
+        // Parsear ANSI se presente, senão textContent (mais rápido)
+        if (hasAnsiCodes(text)) {
+            const fragment = parseAnsiToFragment(text);
+            if (fragment) {
+                lineEl.appendChild(fragment);
+            } else {
+                lineEl.textContent = text;
+            }
+        } else {
+            lineEl.textContent = text;
+        }
+
         output.appendChild(lineEl);
 
         this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
@@ -117,6 +194,43 @@ const UIHelpers = {
         if (statusDot) statusDot.className = "";
         if (stateClass && statusDot) statusDot.classList.add(stateClass);
         if (typeof text === "string" && statusText) statusText.textContent = text;
+
+        // Favicon dinâmico: altera cor do círculo SVG conforme estado
+        this._updateFavicon(stateClass);
+    },
+
+    /**
+     * Atualiza o favicon SVG com a cor correspondente ao estado.
+     */
+    _updateFavicon(stateClass) {
+        const favicon = document.getElementById("favicon");
+        if (!favicon) return;
+        let color = "%23666"; // cinza (desconectado)
+        if (stateClass === CONFIG.CLASSES.connected) color = "%2328a745"; // verde
+        else if (stateClass === CONFIG.CLASSES.connecting) color = "%23ffc107"; // amarelo
+        favicon.href = `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='${color}'/></svg>`;
+    },
+
+    /**
+     * UX #3: Mostra latência no indicador de status.
+     */
+    showLatency(ms) {
+        const statusText = getElement(CONFIG.SELECTORS.statusText);
+        if (!statusText) return;
+        // Só mostra se conectado
+        if (StateStore.getConnectionState() === "CONNECTED") {
+            statusText.textContent = `Conectado (${ms}ms)`;
+        }
+    },
+
+    /**
+     * UX #5: Flash visual no input ao enviar comando.
+     */
+    flashInput() {
+        const input = getElement(CONFIG.SELECTORS.input);
+        if (!input) return;
+        input.classList.add("input-flash");
+        setTimeout(() => input.classList.remove("input-flash"), 200);
     },
 
     setReconnectControls({ visible }) {

@@ -3,10 +3,19 @@
  * Constantes, seletores DOM, padrões e configurações globais
  */
 
+/**
+ * Lê configuração de <meta name="mud-*"> tags do HTML.
+ * Permite externalizar valores sem alterar JS.
+ */
+function _readMeta(name, fallback) {
+    const el = document.querySelector(`meta[name="${name}"]`);
+    return el ? el.getAttribute("content") : fallback;
+}
+
 const CONFIG = {
     // URLs e endpoints
     WS: {
-        url: `ws://${location.host}/ws`,
+        url: _readMeta("mud-ws-url", `ws://${location.host}/ws`),
         reconnectMaxAttempts: 5,
         reconnectBaseDelayMs: 1000,
         reconnectMaxDelayMs: 30000,
@@ -15,6 +24,9 @@ const CONFIG = {
             client: "web"
         }
     },
+
+    // Histórico de comandos (setas ↑/↓)
+    COMMAND_HISTORY_MAX: 50,
 
     // Chaves de armazenamento
     STORAGE_KEYS: {

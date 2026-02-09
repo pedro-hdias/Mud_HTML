@@ -63,11 +63,11 @@ def _configure_root_logger():
     _LOGGER_CONFIGURED = True
 
 
-def get_logger(name):
+def get_logger(name: str) -> logging.Logger:
     _configure_root_logger()
     return logging.getLogger(name)
 
 
-def get_current_log_file_path():
+def get_current_log_file_path() -> str:
     _configure_root_logger()
     return _LOG_FILE_PATH
