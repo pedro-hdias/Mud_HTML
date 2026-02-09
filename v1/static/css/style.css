@@ -339,6 +339,138 @@ body {
     background: #5a6268;
 }
 
+/* Menus interativos acessíveis */
+.menu-container {
+    margin: 10px 0;
+    padding: 10px;
+    background: #1a1a1a;
+    border-left: 3px solid #28a745;
+    border-radius: 4px;
+}
+
+.menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.menu-list li {
+    margin: 0;
+    padding: 0;
+}
+
+.menu-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 12px;
+    margin: 4px 0;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-family: inherit;
+    font-size: 14px;
+    text-align: left;
+    color: inherit;
+}
+
+.menu-option:hover:not(:disabled) {
+    background: #3a3a3a;
+    border-color: #28a745;
+    transform: translateX(4px);
+}
+
+.menu-option:focus {
+    outline: 2px solid #28a745;
+    outline-offset: 2px;
+}
+
+.menu-option:focus-visible {
+    outline: 2px solid #28a745;
+    outline-offset: 2px;
+    background: #3a3a3a;
+}
+
+.menu-option:active:not(:disabled) {
+    transform: translateX(2px);
+    background: #4a4a4a;
+}
+
+.menu-option:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.menu-number {
+    font-weight: bold;
+    color: #28a745;
+    font-family: 'Courier New', monospace;
+    min-width: 30px;
+}
+
+.menu-text {
+    color: #eee;
+    flex: 1;
+}
+
+.menu-prompt {
+    margin-top: 10px;
+    padding: 8px;
+    color: #ffc107;
+    font-style: italic;
+    text-align: center;
+}
+
+.menu-option-selected {
+    background: #28a745 !important;
+    border-color: #28a745 !important;
+}
+
+.menu-option-selected .menu-number {
+    color: #fff;
+}
+
+.menu-option-selected .menu-text {
+    color: #fff;
+    font-weight: 500;
+}
+
+.menu-inactive {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.menu-inactive .menu-option {
+    cursor: default;
+}
+
+/* Suporte para alto contraste */
+@media (prefers-contrast: high) {
+    .menu-option {
+        border-width: 2px;
+    }
+
+    .menu-option:focus,
+    .menu-option:focus-visible {
+        outline-width: 3px;
+    }
+}
+
+/* Suporte para modo reduzir movimento */
+@media (prefers-reduced-motion: reduce) {
+    .menu-option {
+        transition: none;
+    }
+
+    .menu-option:hover:not(:disabled) {
+        transform: none;
+    }
+}
+
 /* Responsividade mobile */
 @media (max-width: 768px) {
     #controls {
