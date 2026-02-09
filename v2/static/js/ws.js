@@ -12,7 +12,11 @@ let lastCommandSent = "";
 let reconnectAttempts = 0;
 let reconnectTimeout = null;
 const MAX_RECONNECT_ATTEMPTS = CONFIG.WS.reconnectMaxAttempts;
-const RECONNECT_DELAY_MS = CONFIG.WS.reconnectDelayMs;
+const RECONNECT_BASE_DELAY_MS = CONFIG.WS.reconnectBaseDelayMs;
+const RECONNECT_MAX_DELAY_MS = CONFIG.WS.reconnectMaxDelayMs;
+
+// Fila de comandos pendentes (enviados durante reconexão)
+let pendingCommandQueue = [];
 
 // Flags de reconexão e sessão ficam no StateStore
 
@@ -113,8 +117,14 @@ function scheduleReconnect() {
     updateConnectionState("RECONNECTING");
 
     reconnectAttempts++;
-    const delay = RECONNECT_DELAY_MS;
-    wsLogger.log(`Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
+    // Exponential backoff com jitter: base * 2^(attempt-1) + random jitter
+    const expDelay = Math.min(
+        RECONNECT_BASE_DELAY_MS * Math.pow(2, reconnectAttempts - 1),
+        RECONNECT_MAX_DELAY_MS
+    );
+    const jitter = Math.floor(Math.random() * 1000);
+    const delay = expDelay + jitter;
+    wsLogger.log(`Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms (base: ${expDelay}, jitter: ${jitter})`);
 
     reconnectTimeout = setTimeout(() => {
         wsLogger.log(`Reconnect attempt ${reconnectAttempts}`);
@@ -376,6 +386,13 @@ function splitCommands(commandText) {
  */
 function sendCommand(commandText) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
+        // Se estamos reconectando, enfileira o comando
+        if (StateStore.isReconnecting() && pendingCommandQueue.length < CONFIG.COMMAND_QUEUE_MAX) {
+            pendingCommandQueue.push(commandText);
+            wsLogger.log("Command queued during reconnect", commandText, `(${pendingCommandQueue.length} in queue)`);
+            UIHelpers.appendSystemMessage(`[SISTEMA] Comando enfileirado (reconectando...) [${pendingCommandQueue.length}/${CONFIG.COMMAND_QUEUE_MAX}]`, "#888");
+            return;
+        }
         wsLogger.error("Cannot send command - WebSocket not connected");
         UIHelpers.appendSystemMessage("[SISTEMA] Não conectado - reconectando...", "orange");
         return;
@@ -386,6 +403,26 @@ function sendCommand(commandText) {
         lastCommandSent = command;
         wsLogger.log("Sending command", command);
         sendMessage("command", { value: command });
+    }
+}
+
+/**
+ * Envia comandos pendentes da fila
+ */
+function flushPendingCommands() {
+    if (pendingCommandQueue.length === 0) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    wsLogger.log(`Flushing ${pendingCommandQueue.length} pending commands`);
+    const queued = [...pendingCommandQueue];
+    pendingCommandQueue = [];
+
+    for (const cmd of queued) {
+        sendCommand(cmd);
+    }
+
+    if (queued.length > 0) {
+        UIHelpers.appendSystemMessage(`[SISTEMA] ${queued.length} comando(s) enfileirado(s) enviado(s).`, "#4CAF50");
     }
 }
 

@@ -16,6 +16,7 @@ from ..config import (
     MUD_PORT,
     MUD_READ_BUFFER_SIZE,
     MUD_IDLE_SLEEP_SECONDS,
+    MUD_PARTIAL_BUFFER_MAX_BYTES,
     HISTORY_MAX_BYTES,
     HISTORY_MAX_LINES
 )
@@ -152,7 +153,7 @@ class MudSession:
                 self.history = "".join(lines[-HISTORY_MAX_LINES:])
     
     async def disconnect_from_mud(self):
-        """Desconecta do MUD e limpa recursos"""
+        """Desconecta do MUD e limpa recursos (preserva histórico para reconexão)"""
         logger.debug(f"Session {self.public_id}: Disconnecting from MUD")
         
         # Cancela a task de leitura se existir
@@ -168,10 +169,17 @@ class MudSession:
         await self.close_mud_connection()
         
         self.reader_task = None
-        self.history = ""
+        # Não limpa self.history aqui — preserva para reconexão.
+        # O histórico só é apagado em clear_session() quando a sessão é removida.
         self.partial_buffer = ""
         
         await self.broadcast_state(ConnectionState.DISCONNECTED)
+
+    def clear_session(self):
+        """Limpa todos os dados da sessão (usado pelo manager ao remover)"""
+        self.history = ""
+        self.partial_buffer = ""
+        logger.debug(f"Session {self.public_id}: Session data cleared")
     
     async def mud_reader(self):
         """Task assíncrona que lê dados do MUD continuamente"""
@@ -216,7 +224,12 @@ class MudSession:
                 # Se sobrou algo no buffer e parece ser um prompt (curto e sem newline), envia também
                 # Isso resolve o problema de telas de login/prompts que não enviam \n
                 if self.partial_buffer:
-                    if len(self.partial_buffer) < 1024 or parser.detect_input_prompt(self.partial_buffer):
+                    # Proteção: flush forçado se buffer exceder limite
+                    if len(self.partial_buffer) > MUD_PARTIAL_BUFFER_MAX_BYTES:
+                        logger.warning(f"Session {self.public_id}: Partial buffer overflow ({len(self.partial_buffer)} bytes), force flushing")
+                        await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
+                        self.partial_buffer = ""
+                    elif len(self.partial_buffer) < 1024 or parser.detect_input_prompt(self.partial_buffer):
                         logger.debug(f"Sending partial buffer as prompt: {self.partial_buffer[:50]}")
                         await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
                         # Limpa o buffer pois já enviamos

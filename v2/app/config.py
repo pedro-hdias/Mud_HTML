@@ -13,6 +13,7 @@ MAX_SESSIONS = int(os.environ.get("MAX_SESSIONS", 50))
 MUD_READ_BUFFER_SIZE = 4096
 MUD_IDLE_SLEEP_SECONDS = 0.05
 MUD_QUIT_GRACE_SECONDS = 0.5
+MUD_PARTIAL_BUFFER_MAX_BYTES = 65536  # 64KB - flush forçado se exceder
 
 # Rate limiting (WebSocket)
 WS_RATE_LIMIT_MAX_MESSAGES = int(os.environ.get("WS_RATE_LIMIT_MAX_MESSAGES", 15))

@@ -8,7 +8,8 @@ const CONFIG = {
     WS: {
         url: `ws://${location.host}/ws`,
         reconnectMaxAttempts: 5,
-        reconnectDelayMs: 3000,
+        reconnectBaseDelayMs: 1000,
+        reconnectMaxDelayMs: 30000,
         backendReadyDelayMs: 500,
         messageMeta: {
             client: "web"
@@ -88,6 +89,12 @@ const CONFIG = {
     // Output
     OUTPUT_MAX_LINES: 2000,
     OUTPUT_HISTORY_MAX_LINES: 2000,
+
+    // Fila de comandos pendentes (quando desconectado temporariamente)
+    COMMAND_QUEUE_MAX: 10,
+
+    // Menu interativo
+    MENU_TIMEOUT_MS: 2500,
 
     // Cookie config
     COOKIE_EXPIRY_DAYS: 30

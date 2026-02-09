@@ -88,6 +88,9 @@ class SessionManager:
             if session.state != session.state.DISCONNECTED:
                 await session.disconnect_from_mud()
             
+            # Limpa dados da sessão (histórico, buffers)
+            session.clear_session()
+            
             # Remove do storage
             self.storage.delete_session(public_id)
             

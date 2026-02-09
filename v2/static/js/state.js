@@ -240,10 +240,16 @@ function updateConnectionState(state) {
                     sendLogin(savedCredentials.username, savedCredentials.password);
                     StateStore.setLoginShown(true);
                     StateManager.saveLoginState();
+                    // Envia comandos enfileirados durante a reconexão
+                    setTimeout(() => {
+                        if (typeof flushPendingCommands === "function") flushPendingCommands();
+                    }, CONFIG.TIMEOUTS.reconnectDelay);
                 }, CONFIG.TIMEOUTS.reconnectDelay);
                 StateStore.setIsReconnecting(false);
             } else if (StateStore.isReconnecting() && !savedCredentials) {
                 StateStore.setIsReconnecting(false);
+                // Sem credenciais, flush imediato (pode ser sessão sem login)
+                if (typeof flushPendingCommands === "function") flushPendingCommands();
             }
             break;
 

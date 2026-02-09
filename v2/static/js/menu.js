@@ -10,8 +10,8 @@ const MenuManager = {
     currentMenu: null,
     // Buffer de linhas para detectar menus
     lineBuffer: [],
-    // Tempo máximo entre linhas de um menu (ms)
-    menuTimeout: 1500,
+    // Tempo máximo entre linhas de um menu (ms) - configurável via CONFIG
+    menuTimeout: CONFIG.MENU_TIMEOUT_MS || 2500,
     // Timer para detecção de fim de menu
     menuTimer: null,
     // Número mínimo de opções para considerar como menu
