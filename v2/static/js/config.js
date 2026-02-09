@@ -74,6 +74,9 @@ const CONFIG = {
         backendReadyDelay: 500
     },
 
+    // Output
+    OUTPUT_MAX_LINES: 2000,
+
     // Cookie config
     COOKIE_EXPIRY_DAYS: 30
 };

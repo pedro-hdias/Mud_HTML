@@ -17,33 +17,6 @@ const RECONNECT_DELAY_MS = 3000;
 
 // Flags de reconexão e sessão ficam no StateStore
 
-const OUTPUT_MAX_LINES = 2000;
-
-function appendSystemMessage(message, color) {
-    const output = getElement(CONFIG.SELECTORS.output);
-    if (!output) return;
-
-    const sysMsg = document.createElement("div");
-    sysMsg.className = CONFIG.CLASSES.systemMessage;
-    if (color) sysMsg.style.color = color;
-    sysMsg.textContent = message;
-    output.appendChild(sysMsg);
-    trimOutputLines(output, OUTPUT_MAX_LINES);
-    output.scrollTop = output.scrollHeight;
-}
-
-function trimOutputLines(output, maxLines) {
-    if (!output) return;
-    let totalLines = output.children.length;
-    if (totalLines <= maxLines) return;
-
-    const toRemove = totalLines - maxLines;
-    for (let i = 0; i < toRemove; i++) {
-        if (output.firstChild) {
-            output.removeChild(output.firstChild);
-        }
-    }
-}
 
 /**
  * Cria e conecta o WebSocket
@@ -82,7 +55,7 @@ function scheduleReconnect() {
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         wsLogger.error("Max reconnect attempts reached");
         allowReconnect = false;
-        appendSystemMessage("[SISTEMA] Falha ao reconectar após várias tentativas. Clique em 'Login' para tentar novamente.", "red");
+        UIHelpers.appendSystemMessage("[SISTEMA] Falha ao reconectar após várias tentativas. Clique em 'Login' para tentar novamente.", "red");
         return;
     }
 
@@ -210,7 +183,7 @@ function handleWebSocketClose(event) {
         scheduleReconnect();
     }
 
-    if (sysMessage) appendSystemMessage(sysMessage, sysColor);
+    if (sysMessage) UIHelpers.appendSystemMessage(sysMessage, sysColor);
 }
 
 // ===== Message Handlers =====
@@ -239,7 +212,7 @@ function handleInitOkMessage(msg) {
         wsLogger.log("New session created");
     } else if (msg.status === "recovered") {
         wsLogger.log("Session recovered successfully");
-        appendSystemMessage("[SISTEMA] Sessão recuperada com sucesso!", "#4CAF50");
+        UIHelpers.appendSystemMessage("[SISTEMA] Sessão recuperada com sucesso!", "#4CAF50");
     }
 
     // Se há credenciais salvas, estamos reconectando
@@ -269,16 +242,7 @@ function handleSessionInvalidMessage(msg) {
         message: msg.message
     });
 
-    const sysMsg = document.createElement("div");
-    sysMsg.className = CONFIG.CLASSES.systemMessage;
-    sysMsg.style.color = "orange";
-    sysMsg.textContent = `[SISTEMA] ${msg.message}`;
-
-    const output = getElement(CONFIG.SELECTORS.output);
-    if (output) {
-        output.appendChild(sysMsg);
-        output.scrollTop = output.scrollHeight;
-    }
+    UIHelpers.appendSystemMessage(`[SISTEMA] ${msg.message}`, "orange");
 
     // O WebSocket será fechado pelo servidor com código 4003
     // O handler onclose cuidará da limpeza e reconexão
@@ -290,31 +254,13 @@ function handleStateMessage(msg) {
 
 function handleErrorMessage(msg) {
     wsLogger.error("Server error", msg.message);
-    appendSystemMessage("[ERRO] " + msg.message, "red");
+    UIHelpers.appendSystemMessage("[ERRO] " + msg.message, "red");
 }
 
 function handleHistoryMessage(msg) {
-    const historyContainer = document.createElement("div");
-    historyContainer.className = CONFIG.CLASSES.historyBlock;
+    UIHelpers.appendHistoryBlock(msg.content);
 
-    const lines = msg.content.split(/\r?\n/);
-    lines.forEach((line, idx) => {
-        if (line || idx < lines.length - 1) {
-            const lineEl = document.createElement("div");
-            lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.history}`;
-            lineEl.textContent = line;
-            historyContainer.appendChild(lineEl);
-        }
-    });
-
-    const output = getElement(CONFIG.SELECTORS.output);
-    if (output) {
-        output.appendChild(historyContainer);
-        trimOutputLines(output, OUTPUT_MAX_LINES);
-        output.scrollTop = output.scrollHeight;
-    }
-
-    if (msg.content && window.isReconnecting) {
+    if (msg.content && StateStore.isReconnecting()) {
         wsLogger.log("History received during reconnection - session active");
     }
 }
@@ -328,12 +274,7 @@ function handleLineMessage(msg) {
 
     // Se não for linha de menu, processa normalmente
     if (!isMenuLine) {
-        const lineEl = document.createElement("div");
-        lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.new}`;
-        lineEl.textContent = msg.content.trimEnd();
-        output.appendChild(lineEl);
-        trimOutputLines(output, OUTPUT_MAX_LINES);
-        output.scrollTop = output.scrollHeight;
+        UIHelpers.appendOutputLine(msg.content.trimEnd());
     }
 
     PromptDetector.setLastLine(msg.content);
@@ -347,7 +288,7 @@ function handleLineMessage(msg) {
         lineText.includes("senha:");
 
     if (hasInputPrompt || lineText.includes("play") || lineText.includes("enter") ||
-        (currentState === "CONNECTED" && output && output.children.length > 3)) {
+        (StateStore.getConnectionState() === "CONNECTED" && output && output.children.length > 3)) {
         checkAndShowLogin();
     }
 
@@ -359,7 +300,7 @@ function handleLineMessage(msg) {
 }
 
 function handleSystemMessage(msg) {
-    appendSystemMessage("[SISTEMA] " + msg.message);
+    UIHelpers.appendSystemMessage("[SISTEMA] " + msg.message);
 }
 
 // ===== Funkcionalidade: Dividir comandos por `;` =====
@@ -380,7 +321,7 @@ function splitCommands(commandText) {
 function sendCommand(commandText) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
         wsLogger.error("Cannot send command - WebSocket not connected");
-        appendSystemMessage("[SISTEMA] Não conectado - reconectando...", "orange");
+        UIHelpers.appendSystemMessage("[SISTEMA] Não conectado - reconectando...", "orange");
         return;
     }
 

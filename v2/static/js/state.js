@@ -174,46 +174,46 @@ function updateConnectionState(state) {
     const previousState = StateStore.setConnectionState(state);
     stateLogger.log("State change", previousState, "->", state);
 
-    const statusDot = getElement(CONFIG.SELECTORS.statusDot);
-    const statusText = getElement(CONFIG.SELECTORS.statusText);
-    const btnLogin = getElement(CONFIG.SELECTORS.btnLogin);
-    const btnDisconnect = getElement(CONFIG.SELECTORS.btnDisconnect);
-    const btnSend = getElement(CONFIG.SELECTORS.btnSend);
-    const input = getElement(CONFIG.SELECTORS.input);
-
-    if (statusDot) statusDot.className = "";
-
     switch (state) {
         case "DISCONNECTED":
-            if (statusText) statusText.textContent = "Desconectado";
-            if (btnLogin) btnLogin.disabled = false;
-            if (btnDisconnect) btnDisconnect.disabled = true;
-            if (btnSend) btnSend.disabled = true;
-            if (input) input.disabled = true;
+            UIHelpers.setStatusIndicator({ text: "Desconectado" });
+            UIHelpers.setButtonsState({
+                loginDisabled: false,
+                disconnectDisabled: true,
+                sendDisabled: true,
+                inputDisabled: true
+            });
             if (!StateStore.isReconnecting() && StateStore.isSessionInitialized()) {
                 StateManager.clearSessionState();
             }
             break;
 
         case "CONNECTING":
-            if (statusText) statusText.textContent = "Conectando...";
-            if (statusDot) statusDot.classList.add(CONFIG.CLASSES.connecting);
-            if (btnLogin) btnLogin.disabled = true;
-            if (btnDisconnect) btnDisconnect.disabled = true;
-            if (btnSend) btnSend.disabled = true;
-            if (input) input.disabled = true;
+            UIHelpers.setStatusIndicator({
+                text: "Conectando...",
+                stateClass: CONFIG.CLASSES.connecting
+            });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: true,
+                sendDisabled: true,
+                inputDisabled: true
+            });
             break;
 
         case "CONNECTED":
-            if (statusText) statusText.textContent = "Conectado";
-            if (statusDot) statusDot.classList.add(CONFIG.CLASSES.connected);
-            if (btnLogin) btnLogin.disabled = true;
-            if (btnDisconnect) btnDisconnect.disabled = false;
-            if (btnSend) btnSend.disabled = false;
-            if (input) {
-                input.disabled = false;
-                input.focus();
-            }
+            UIHelpers.setStatusIndicator({
+                text: "Conectado",
+                stateClass: CONFIG.CLASSES.connected
+            });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: false,
+                sendDisabled: false,
+                inputDisabled: false
+            });
+            const input = getElement(CONFIG.SELECTORS.input);
+            if (input) input.focus();
 
             // Se estamos reconectando, tenta fazer login automaticamente
             const savedCredentials = StateStore.getSavedCredentials();
@@ -229,12 +229,16 @@ function updateConnectionState(state) {
             break;
 
         case "AWAITING_LOGIN":
-            if (statusText) statusText.textContent = "Aguardando login";
-            if (statusDot) statusDot.classList.add(CONFIG.CLASSES.connected);
-            if (btnLogin) btnLogin.disabled = true;
-            if (btnDisconnect) btnDisconnect.disabled = false;
-            if (btnSend) btnSend.disabled = true;
-            if (input) input.disabled = true;
+            UIHelpers.setStatusIndicator({
+                text: "Aguardando login",
+                stateClass: CONFIG.CLASSES.connected
+            });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: false,
+                sendDisabled: true,
+                inputDisabled: true
+            });
             break;
     }
 }
