@@ -1,8 +1,9 @@
-from fastapi import FastAPI, WebSocket
+from fastapi import FastAPI, WebSocket, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 from .ws import websocket_endpoint, session_manager
 from .logger import get_logger, get_current_log_file_path
+from .config import DEBUG_MODE
 import os
 import asyncio
 import aiofiles
@@ -39,11 +40,16 @@ def index():
 @app.get("/sessions")
 def sessions_page():
     """Página de debug para visualizar sessões ativas"""
+    if not DEBUG_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
     return FileResponse("static/sessions.html")
 
 @app.get("/api/sessions/status")
 def sessions_status():
     """Retorna status das sessões ativas (útil para debug)"""
+    if not DEBUG_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+    
     sessions_info = []
     for session_id, session in session_manager.sessions.items():
         sessions_info.append({
@@ -79,11 +85,16 @@ async def websocket_route(websocket: WebSocket):
 @app.get("/logs")
 def logs_page():
     """Página para visualizar logs em tempo real"""
+    if not DEBUG_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
     return FileResponse("static/logs.html")
 
 @app.get("/api/logs/stream")
 async def logs_stream():
     """Stream de logs em tempo real usando Server-Sent Events"""
+    if not DEBUG_MODE:
+        raise HTTPException(status_code=404, detail="Not found")
+    
     async def event_generator():
         log_file = get_current_log_file_path()
         
