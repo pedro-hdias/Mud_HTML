@@ -31,7 +31,8 @@ class MudSession:
     def __init__(self, public_id: str):
         self.public_id = public_id  # ID público da sessão
         self.owner_token = secrets.token_urlsafe(32)  # Prova de propriedade (secreto)
-        self.socket: socket.socket = None
+        self.reader = None
+        self.writer = None
         self.history = ""
         self.partial_buffer = ""
         self.reader_task: asyncio.Task = None
@@ -97,62 +98,44 @@ class MudSession:
         # Remove clientes desconectados
         for ws in disconnected_clients:
             self.remove_websocket(ws)
-    
-    def connect_to_mud(self) -> bool:
+    async def connect_to_mud(self) -> bool:
         """Conecta ao servidor MUD"""
         try:
-            logger.debug(f"Session {self.public_id}: Opening TCP socket to {MUD_HOST}:{MUD_PORT}")
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socket.connect((MUD_HOST, MUD_PORT))
-            self.socket.setblocking(False)
-            logger.info(f"Session {self.public_id}: TCP socket connected")
+            logger.debug(f"Session {self.public_id}: Opening connection to {MUD_HOST}:{MUD_PORT}")
+            self.reader, self.writer = await asyncio.open_connection(MUD_HOST, MUD_PORT)
+            logger.info(f"Session {self.public_id}: TCP connection established")
             self.touch()
             return True
         except Exception as e:
-            logger.exception(f"Session {self.public_id}: TCP socket connection failed: {e}")
-            self.socket = None
+            logger.exception(f"Session {self.public_id}: Connection failed: {e}")
+            self.reader = None
+            self.writer = None
             return False
     
-    def close_mud_socket(self):
-        """Fecha o socket TCP do MUD"""
-        if self.socket:
+    async def close_mud_connection(self):
+        """Fecha a conexão com o MUD"""
+        if self.writer:
             try:
-                logger.debug(f"Session {self.public_id}: Closing TCP socket")
-                self.socket.close()
-                logger.debug(f"Session {self.public_id}: TCP socket closed")
+                logger.debug(f"Session {self.public_id}: Closing connection")
+                self.writer.close()
+                await self.writer.wait_closed()
+                logger.debug(f"Session {self.public_id}: Connection closed")
             except Exception as e:
-                logger.exception(f"Session {self.public_id}: TCP socket close failed: {e}")
-            self.socket = None
+                logger.exception(f"Session {self.public_id}: Close failed: {e}")
+            self.writer = None
+            self.reader = None
     
-    def send_to_mud(self, data: bytes):
+    async def send_to_mud(self, data: bytes):
         """Envia dados para o MUD"""
-        if self.socket:
+        if self.writer:
             try:
-                logger.debug(f"Session {self.public_id}: Sending {len(data)} bytes to MUD")
-                self.socket.sendall(data)
+                logger.debug(f"Session {self.public_id}: Sending {len(data)} bytes")
+                self.writer.write(data)
+                await self.writer.drain()
                 self.touch()
             except Exception as e:
-                logger.exception(f"Session {self.public_id}: Socket send failed: {e}")
+                logger.exception(f"Session {self.public_id}: Send failed: {e}")
                 raise
-    
-    def receive_from_mud(self, buffer_size=MUD_READ_BUFFER_SIZE) -> bytes:
-        """Recebe dados do MUD"""
-        if self.socket:
-            try:
-                data = self.socket.recv(buffer_size)
-                if data:
-                    logger.debug(f"Session {self.public_id}: Received {len(data)} bytes from MUD")
-                    self.touch()
-                return data
-            except BlockingIOError:
-                # Não é erro - socket non-blocking sem dados disponíveis
-                # Re-raise para o caller tratar
-                raise
-            except Exception as e:
-                # Erros reais (socket fechado, timeout, etc)
-                logger.exception(f"Session {self.public_id}: Socket receive failed: {e}")
-                raise
-        return None
 
     def _append_history(self, text: str):
         if not text:
@@ -181,8 +164,8 @@ class MudSession:
             except asyncio.CancelledError:
                 logger.debug(f"Session {self.public_id}: MUD reader task cancelled")
         
-        # Fecha o socket
-        self.close_mud_socket()
+        # Fecha a conexão
+        await self.close_mud_connection()
         
         self.reader_task = None
         self.history = ""
@@ -194,32 +177,25 @@ class MudSession:
         """Task assíncrona que lê dados do MUD continuamente"""
         logger.debug(f"Session {self.public_id}: MUD reader started")
         
-        consecutive_errors = 0
-        max_consecutive_errors = 10
-        
         while True:
             try:
-                data = self.receive_from_mud()
+                data = await self.reader.read(MUD_READ_BUFFER_SIZE)
                 if not data:
-                    # Socket fechado pelo servidor
-                    logger.debug(f"Session {self.public_id}: MUD socket closed by server")
+                    # Conexão fechada pelo servidor
+                    logger.debug(f"Session {self.public_id}: MUD connection closed by server")
                     await self.disconnect_from_mud()
                     await self.broadcast_message(make_message("system", {
                         "message": "Conexão encerrada pelo servidor"
                     }))
                     break
                 
-                # Reseta contador de erros ao receber dados com sucesso
-                consecutive_errors = 0
-                
                 text = data.decode(errors="ignore")
-                logger.debug(f"Session {self.public_id}: Received MUD data chunk: {len(text)} chars")
+                logger.debug(f"Session {self.public_id}: Received {len(text)} chars")
                 self.partial_buffer += text
                 self._append_history(text)
                 
-                # Processa linhas completas (delimitadas por \n ou \r\n)
+                # Processa linhas completas
                 while "\n" in self.partial_buffer:
-                    # Encontra o próximo delimitador
                     if "\r\n" in self.partial_buffer:
                         line, self.partial_buffer = self.partial_buffer.split("\r\n", 1)
                         line += "\r\n"
@@ -227,26 +203,27 @@ class MudSession:
                         line, self.partial_buffer = self.partial_buffer.split("\n", 1)
                         line += "\n"
                     
-                    # Detecta desconexão pelo padrão "*** Disconnected ***"
                     if parser.detect_disconnection(line):
-                        # Envia a linha primeiro
                         await self.broadcast_message(make_message("line", {"content": line}))
-                        
-                        # Depois desconecta
                         await self.disconnect_from_mud()
                         await self.broadcast_message(make_message("system", {
                             "message": "Desconectado do servidor"
                         }))
                         return
                     
-                    # Envia cada linha completa como um evento separado
                     await self.broadcast_message(make_message("line", {"content": line}))
-            
-            except BlockingIOError:
-                # BlockingIOError não é um erro - é normal quando não há dados disponíveis
-                # O servidor pode estar aguardando input do usuário (menu, prompt, etc)
-                # Não incrementa o contador de erros
-                await asyncio.sleep(MUD_IDLE_SLEEP_SECONDS)
+
+                # Se sobrou algo no buffer e parece ser um prompt (curto e sem newline), envia também
+                # Isso resolve o problema de telas de login/prompts que não enviam \n
+                if self.partial_buffer:
+                    if len(self.partial_buffer) < 1024 or parser.detect_input_prompt(self.partial_buffer):
+                        logger.debug(f"Sending partial buffer as prompt: {self.partial_buffer[:50]}")
+                        await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
+                        # Limpa o buffer pois já enviamos
+                        self.partial_buffer = ""
+
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 logger.exception(f"Session {self.public_id}: Error reading from MUD: {e}")
                 await self.disconnect_from_mud()
@@ -254,4 +231,3 @@ class MudSession:
                     "message": f"Erro de conexão: {e}"
                 }))
                 break
-

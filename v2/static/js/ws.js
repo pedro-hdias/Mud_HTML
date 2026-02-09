@@ -11,7 +11,6 @@ let ws = null;
 let lastCommandSent = "";
 let reconnectAttempts = 0;
 let reconnectTimeout = null;
-let isManualDisconnect = false;
 const MAX_RECONNECT_ATTEMPTS = CONFIG.WS.reconnectMaxAttempts;
 const RECONNECT_DELAY_MS = CONFIG.WS.reconnectDelayMs;
 
@@ -204,7 +203,6 @@ function handleWebSocketError(error) {
 function handleWebSocketClose(event) {
     wsLogger.warn("WebSocket closed", { code: event.code, reason: event.reason });
 
-    const output = getElement(CONFIG.SELECTORS.output);
     let sysMessage = "";
     let sysColor = null;
 

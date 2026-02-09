@@ -103,6 +103,14 @@ function getElement(selector) {
     return DOM_CACHE[selector];
 }
 
+function invalidateElementCache(selector) {
+    if (selector) {
+        delete DOM_CACHE[selector];
+    } else {
+        Object.keys(DOM_CACHE).forEach(key => delete DOM_CACHE[key]);
+    }
+}
+
 function getAllElements(selector) {
     return document.querySelectorAll(selector);
 }

@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -7,30 +8,30 @@ import os
 import asyncio
 import aiofiles
 
-app = FastAPI()
 logger = get_logger("main")
+
+
+@asynccontextmanager
+async def lifespan(app):
+    # Startup
+    logger.debug("Application startup")
+    await session_manager.invalidate_all_sessions()
+    logger.info("Previous sessions invalidated")
+    await session_manager.start_cleanup_task()
+    logger.info("Session cleanup task started")
+    
+    yield
+    
+    # Shutdown
+    logger.debug("Application shutdown")
+    await session_manager.stop_cleanup_task()
+    logger.info("Session cleanup task stopped")
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Monta arquivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.on_event("startup")
-async def on_startup():
-    logger.debug("Application startup")
-    
-    # Invalida todas as sessões anteriores
-    await session_manager.invalidate_all_sessions()
-    logger.info("Previous sessions invalidated")
-    
-    # Inicia task de limpeza de sessões inativas
-    await session_manager.start_cleanup_task()
-    logger.info("Session cleanup task started")
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    logger.debug("Application shutdown")
-    # Para task de limpeza
-    await session_manager.stop_cleanup_task()
-    logger.info("Session cleanup task stopped")
 
 @app.get("/")
 def index():
@@ -101,26 +102,33 @@ async def logs_stream():
         # Agora faz tail -f (follow mode)
         last_size = os.path.getsize(log_file) if os.path.exists(log_file) else 0
         
-        while True:
-            try:
-                if os.path.exists(log_file):
-                    current_size = os.path.getsize(log_file)
-                    if current_size > last_size:
-                        async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
-                            await f.seek(last_size)
-                            new_content = await f.read()
-                            for line in new_content.splitlines():
-                                if line.strip():
-                                    yield f"data: {line}\n\n"
-                        last_size = current_size
-                    elif current_size < last_size:
-                        # Arquivo foi truncado/recriado
-                        last_size = 0
-                        
-                await asyncio.sleep(0.5)  # Verifica a cada 500ms
-            except Exception as e:
-                yield f"data: [ERROR] {e}\n\n"
-                await asyncio.sleep(1)
+        try:
+            while True:
+                try:
+                    if os.path.exists(log_file):
+                        current_size = os.path.getsize(log_file)
+                        if current_size > last_size:
+                            async with aiofiles.open(log_file, 'r', encoding='utf-8') as f:
+                                await f.seek(last_size)
+                                new_content = await f.read()
+                                for line in new_content.splitlines():
+                                    if line.strip():
+                                        yield f"data: {line}\n\n"
+                            last_size = current_size
+                        elif current_size < last_size:
+                            # Arquivo foi truncado/recriado
+                            last_size = 0
+                            
+                    await asyncio.sleep(0.5)  # Verifica a cada 500ms
+                except (asyncio.CancelledError, GeneratorExit):
+                    logger.debug("SSE client disconnected")
+                    return
+                except Exception as e:
+                    yield f"data: [ERROR] {e}\n\n"
+                    await asyncio.sleep(1)
+        except (asyncio.CancelledError, GeneratorExit):
+            logger.debug("SSE stream ended")
+            return
     
     return StreamingResponse(
         event_generator(),
