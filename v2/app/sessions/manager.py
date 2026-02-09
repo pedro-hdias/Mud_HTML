@@ -76,7 +76,7 @@ class SessionManager:
         """Remove uma sessão e limpa recursos"""
         if public_id in self.sessions:
             session = self.sessions[public_id]
-            logger.info(f"Removing session: {session_id}")
+            logger.info(f"Removing session: {public_id}")
             
             # Desconecta do MUD se conectado
             if session.state != session.state.DISCONNECTED:
@@ -99,7 +99,7 @@ class SessionManager:
                 # Verifica se passou do timeout
                 inactive_time = now - session.last_activity
                 if inactive_time > self.session_timeout:
-                    logger.info(f"Session {session_id} inactive for {inactive_time}, marking for cleanup")
+                    logger.info(f"Session {public_id} inactive for {inactive_time}, marking for cleanup")
                     sessions_to_remove.append(public_id)
         
         # Remove sessões marcadas
@@ -145,12 +145,12 @@ class SessionManager:
     
     async def schedule_session_removal(self, public_id: str, delay_seconds: int = 30):
         """Agenda remoção de uma sessão após um delay (usado em desconexão manual)"""
-        logger.info(f"Scheduling removal of session {session_id} in {delay_seconds}s")
+        logger.info(f"Scheduling removal of session {public_id} in {delay_seconds}s")
         await asyncio.sleep(delay_seconds)
         
         if public_id in self.sessions:
             await self.remove_session(public_id)
-            logger.info(f"Session {session_id} removed after manual disconnect")
+            logger.info(f"Session {public_id} removed after manual disconnect")
     
     async def invalidate_all_sessions(self):
         """Invalida e remove todas as sessões existentes"""
@@ -162,14 +162,14 @@ class SessionManager:
                 if session.state != session.state.DISCONNECTED:
                     await session.disconnect_from_mud()
             except Exception as e:
-                logger.exception(f"Error disconnecting session {session_id}: {e}")
+                logger.exception(f"Error disconnecting session {public_id}: {e}")
         
         # Limpa o storage
         for public_id in self.storage.list_sessions():
             try:
                 self.storage.delete_session(public_id)
             except Exception as e:
-                logger.exception(f"Error deleting session {session_id} from storage: {e}")
+                logger.exception(f"Error deleting session {public_id} from storage: {e}")
         
         # Limpa o dicionário de sessões
         self.sessions.clear()
