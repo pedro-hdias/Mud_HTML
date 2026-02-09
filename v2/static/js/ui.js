@@ -100,6 +100,13 @@ const UIHelpers = {
         if (statusDot) statusDot.className = "";
         if (stateClass && statusDot) statusDot.classList.add(stateClass);
         if (typeof text === "string" && statusText) statusText.textContent = text;
+    },
+
+    setReconnectControls({ visible }) {
+        const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
+        if (!reconnectStatus) return;
+
+        reconnectStatus.hidden = !visible;
     }
 };
 

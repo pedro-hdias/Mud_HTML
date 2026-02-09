@@ -29,6 +29,7 @@ const EventManager = {
         const btnDisconnect = getElement(CONFIG.SELECTORS.btnDisconnect);
         const btnClear = getElement(CONFIG.SELECTORS.btnClear);
         const btnSend = getElement(CONFIG.SELECTORS.btnSend);
+        const btnCancelReconnect = getElement(CONFIG.SELECTORS.btnCancelReconnect);
 
         if (btnLogin) {
             btnLogin.addEventListener("click", () => {
@@ -55,6 +56,13 @@ const EventManager = {
             btnSend.addEventListener("click", () => {
                 eventsLogger.log("Send button clicked");
                 this.handleSendClick();
+            });
+        }
+
+        if (btnCancelReconnect) {
+            btnCancelReconnect.addEventListener("click", () => {
+                eventsLogger.log("Cancel reconnect clicked");
+                this.handleCancelReconnectClick();
             });
         }
     },
@@ -222,6 +230,12 @@ const EventManager = {
         StateManager.clearSessionState();
         ModalManager.hideLoginModal();
         ModalManager.resetLoginModalDismissal();
+    },
+
+    handleCancelReconnectClick() {
+        if (typeof cancelReconnectAttempt === "function") {
+            cancelReconnectAttempt();
+        }
     },
 
     handleClearClick() {

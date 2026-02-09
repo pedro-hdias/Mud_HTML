@@ -37,6 +37,10 @@ const CONFIG = {
         btnClear: "#btnClear",
         btnSend: "#btnSend",
         btnCancelLogin: "#btnCancelLogin",
+        btnCancelReconnect: "#btnCancelReconnect",
+
+        // Reconexao
+        reconnectStatus: "#reconnectStatus",
 
         // Status
         statusDot: "#statusDot",

@@ -91,20 +91,27 @@ function scheduleReconnect() {
     if (StateStore.isManualDisconnect()) {
         wsLogger.log("Manual disconnect - not reconnecting");
         StateStore.setAllowReconnect(false);
+        StateStore.setIsReconnecting(false);
         return;
     }
 
     if (!StateStore.isReconnectAllowed()) {
         wsLogger.log("Auto-reconnect not allowed - waiting for user action");
+        StateStore.setIsReconnecting(false);
         return;
     }
 
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
         wsLogger.error("Max reconnect attempts reached");
-        allowReconnect = false;
+        StateStore.setAllowReconnect(false);
+        StateStore.setIsReconnecting(false);
+        updateConnectionState("DISCONNECTED");
         UIHelpers.appendSystemMessage("[SISTEMA] Falha ao reconectar após várias tentativas. Clique em 'Login' para tentar novamente.", "red");
         return;
     }
+
+    StateStore.setIsReconnecting(true);
+    updateConnectionState("RECONNECTING");
 
     reconnectAttempts++;
     const delay = RECONNECT_DELAY_MS;
@@ -216,12 +223,19 @@ function handleWebSocketClose(event) {
         // Limpa sessão em desconexão manual
         StorageManager.clearSession();
         StateStore.setAllowReconnect(false);
+        StateStore.setIsReconnecting(false);
         updateConnectionState("DISCONNECTED");
     } else {
         // Conexão perdida involuntariamente
+        if (!StateStore.isReconnectAllowed()) {
+            updateConnectionState("DISCONNECTED");
+            return;
+        }
+
         if (reconnectAttempts === 0) {
             sysMessage = "[SISTEMA] Conexão perdida - tentando reconectar...";
         }
+        updateConnectionState("RECONNECTING");
         scheduleReconnect();
     }
 
@@ -398,5 +412,25 @@ function sendLogin(username, password) {
         username: username,
         password: password
     });
+}
+
+/**
+ * Cancela tentativa de reconexão
+ */
+function cancelReconnectAttempt() {
+    if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+        reconnectTimeout = null;
+    }
+
+    StateStore.setAllowReconnect(false);
+    StateStore.setIsReconnecting(false);
+    updateConnectionState("DISCONNECTED");
+
+    if (ws && ws.readyState === WebSocket.CONNECTING) {
+        ws.close();
+    }
+
+    UIHelpers.appendSystemMessage("[SISTEMA] Reconexão cancelada.", "orange");
 }
 

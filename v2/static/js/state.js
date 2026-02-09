@@ -177,6 +177,7 @@ function updateConnectionState(state) {
     switch (state) {
         case "DISCONNECTED":
             UIHelpers.setStatusIndicator({ text: "Desconectado" });
+            UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
                 loginDisabled: false,
                 disconnectDisabled: true,
@@ -193,6 +194,21 @@ function updateConnectionState(state) {
                 text: "Conectando...",
                 stateClass: CONFIG.CLASSES.connecting
             });
+            UIHelpers.setReconnectControls({ visible: false });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: true,
+                sendDisabled: true,
+                inputDisabled: true
+            });
+            break;
+
+        case "RECONNECTING":
+            UIHelpers.setStatusIndicator({
+                text: "Reconectando...",
+                stateClass: CONFIG.CLASSES.connecting
+            });
+            UIHelpers.setReconnectControls({ visible: true });
             UIHelpers.setButtonsState({
                 loginDisabled: true,
                 disconnectDisabled: true,
@@ -206,6 +222,7 @@ function updateConnectionState(state) {
                 text: "Conectado",
                 stateClass: CONFIG.CLASSES.connected
             });
+            UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
                 loginDisabled: true,
                 disconnectDisabled: false,
@@ -225,6 +242,8 @@ function updateConnectionState(state) {
                     StateManager.saveLoginState();
                 }, CONFIG.TIMEOUTS.reconnectDelay);
                 StateStore.setIsReconnecting(false);
+            } else if (StateStore.isReconnecting() && !savedCredentials) {
+                StateStore.setIsReconnecting(false);
             }
             break;
 
@@ -233,6 +252,7 @@ function updateConnectionState(state) {
                 text: "Aguardando login",
                 stateClass: CONFIG.CLASSES.connected
             });
+            UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
                 loginDisabled: true,
                 disconnectDisabled: false,

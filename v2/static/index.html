@@ -20,6 +20,11 @@
             <div id="statusDot"></div>
             <span id="statusText">Desconectado</span>
         </div>
+
+        <div id="reconnectStatus" aria-live="polite" hidden>
+            <span>Reconectando...</span>
+            <button id="btnCancelReconnect" type="button">Cancelar tentativa</button>
+        </div>
     </div>
 
     <!-- Área de output -->
@@ -32,6 +37,8 @@
             disabled />
         <button id="btnSend" aria-label="Enviar comando" title="Enviar comando" disabled>Enviar</button>
     </div>
+
+    <div id="inputHints">Enter para enviar, ; para múltiplos</div>
 
     <!-- Modal de Login -->
     <div id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
