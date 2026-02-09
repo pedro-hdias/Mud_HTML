@@ -7,17 +7,34 @@
 const uiLogger = createLogger("ui");
 
 const UIHelpers = {
+    _scrollRafId: null,
+
+    /**
+     * Agenda scroll para o fim do output usando rAF.
+     * Múltiplas chamadas dentro do mesmo frame são agrupadas.
+     */
+    _scheduleScrollToBottom(output) {
+        if (!output) return;
+        if (this._scrollRafId) return; // já agendado
+        this._scrollRafId = requestAnimationFrame(() => {
+            this._scrollRafId = null;
+            output.scrollTop = output.scrollHeight;
+        });
+    },
+
     trimOutputLines(output, maxLines) {
         if (!output) return;
-        let totalLines = output.children.length;
+        const totalLines = output.children.length;
         if (totalLines <= maxLines) return;
 
         const toRemove = totalLines - maxLines;
-        for (let i = 0; i < toRemove; i++) {
-            if (output.firstChild) {
-                output.removeChild(output.firstChild);
-            }
-        }
+
+        // Range API: remoção em lote causa um único reflow
+        // em vez de N reflows com removeChild() em loop
+        const range = document.createRange();
+        range.setStartBefore(output.firstChild);
+        range.setEndAfter(output.children[toRemove - 1]);
+        range.deleteContents();
     },
     appendSystemMessage(message, color) {
         const output = getElement(CONFIG.SELECTORS.output);
@@ -31,7 +48,7 @@ const UIHelpers = {
 
         this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
 
-        output.scrollTop = output.scrollHeight;
+        this._scheduleScrollToBottom(output);
     },
     appendOutputLine(text, options = {}) {
         const output = getElement(CONFIG.SELECTORS.output);
@@ -49,7 +66,7 @@ const UIHelpers = {
         output.appendChild(lineEl);
 
         this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
-        output.scrollTop = output.scrollHeight;
+        this._scheduleScrollToBottom(output);
     },
     appendHistoryBlock(content) {
         const output = getElement(CONFIG.SELECTORS.output);
@@ -73,7 +90,7 @@ const UIHelpers = {
 
         output.appendChild(historyContainer);
         this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
-        output.scrollTop = output.scrollHeight;
+        this._scheduleScrollToBottom(output);
     },
 
     setButtonsState({

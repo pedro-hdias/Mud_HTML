@@ -22,8 +22,36 @@ const StateStore = {
             this._listeners[event] = new Set();
         }
         this._listeners[event].add(handler);
+        // Retorna função de remoção para facilitar cleanup
         return () => this._listeners[event].delete(handler);
     },
+
+    /**
+     * Remove um handler específico de um evento.
+     * Alternativa explícita ao callback retornado por on().
+     */
+    off(event, handler) {
+        const handlers = this._listeners[event];
+        if (handlers) {
+            handlers.delete(handler);
+            if (handlers.size === 0) {
+                delete this._listeners[event];
+            }
+        }
+    },
+
+    /**
+     * Remove todos os listeners. Se 'event' for informado,
+     * remove apenas os listeners daquele evento.
+     */
+    removeAllListeners(event) {
+        if (event) {
+            delete this._listeners[event];
+        } else {
+            this._listeners = {};
+        }
+    },
+
     _emit(event, payload) {
         const handlers = this._listeners[event];
         if (!handlers) return;

@@ -7,11 +7,16 @@ const eventsLogger = createLogger("events");
 
 const EventManager = {
     initialized: false,
+    _abortController: null,
 
     init() {
         if (this.initialized) return;
 
         try {
+            // AbortController permite remover todos os listeners de uma vez
+            // e garante que re-inicialização não duplica listeners
+            this._abortController = new AbortController();
+
             this.bindButtonEvents();
             this.bindInputEvents();
             this.bindLoginFormEvents();
@@ -22,6 +27,19 @@ const EventManager = {
         } catch (e) {
             eventsLogger.error("Error initializing events", e);
         }
+    },
+
+    /**
+     * Destroi todos os event listeners registrados.
+     * Permite re-inicialização limpa se necessário.
+     */
+    destroy() {
+        if (this._abortController) {
+            this._abortController.abort();
+            this._abortController = null;
+        }
+        this.initialized = false;
+        eventsLogger.log("Event manager destroyed");
     },
 
     bindButtonEvents() {
@@ -35,35 +53,35 @@ const EventManager = {
             btnLogin.addEventListener("click", () => {
                 eventsLogger.log("Login button clicked");
                 this.handleLoginClick();
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnDisconnect) {
             btnDisconnect.addEventListener("click", () => {
                 eventsLogger.log("Disconnect button clicked");
                 this.handleDisconnectClick();
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnClear) {
             btnClear.addEventListener("click", () => {
                 eventsLogger.log("Clear output clicked");
                 this.handleClearClick();
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnSend) {
             btnSend.addEventListener("click", () => {
                 eventsLogger.log("Send button clicked");
                 this.handleSendClick();
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnCancelReconnect) {
             btnCancelReconnect.addEventListener("click", () => {
                 eventsLogger.log("Cancel reconnect clicked");
                 this.handleCancelReconnectClick();
-            });
+            }, { signal: this._abortController.signal });
         }
     },
 
@@ -76,7 +94,7 @@ const EventManager = {
                 e.preventDefault();
                 this.handleSendClick();
             }
-        });
+        }, { signal: this._abortController.signal });
     },
 
     bindLoginFormEvents() {
@@ -88,7 +106,7 @@ const EventManager = {
                 e.preventDefault();
                 eventsLogger.log("Login form submitted");
                 this.handleLoginSubmit();
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnCancelLogin) {
@@ -102,7 +120,7 @@ const EventManager = {
                     input.disabled = false;
                     input.focus();
                 }
-            });
+            }, { signal: this._abortController.signal });
         }
     },
 
@@ -125,7 +143,7 @@ const EventManager = {
                         input.focus();
                     }
                 }
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (confirmModal) {
@@ -134,21 +152,21 @@ const EventManager = {
                     eventsLogger.log("Confirm modal backdrop clicked");
                     this.sendConfirmNo();
                 }
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnConfirmYes) {
             btnConfirmYes.addEventListener("click", () => {
                 eventsLogger.log("Confirm yes clicked");
                 this.sendConfirmYes();
-            });
+            }, { signal: this._abortController.signal });
         }
 
         if (btnConfirmNo) {
             btnConfirmNo.addEventListener("click", () => {
                 eventsLogger.log("Confirm no clicked");
                 this.sendConfirmNo();
-            });
+            }, { signal: this._abortController.signal });
         }
     },
 
@@ -179,7 +197,7 @@ const EventManager = {
                     this.sendConfirmYes();
                 }
             }
-        });
+        }, { signal: this._abortController.signal });
     },
 
     // Handlers
