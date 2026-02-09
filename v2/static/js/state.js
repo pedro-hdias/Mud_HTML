@@ -6,6 +6,7 @@
 const stateLogger = createLogger("state");
 
 const StateStore = {
+    _listeners: {},
     _connectionState: "DISCONNECTED",
     _savedCredentials: null,
     _loginShown: false,
@@ -16,6 +17,24 @@ const StateStore = {
     _connectRequested: false,
     _allowReconnect: false,
     _manualDisconnect: false,
+    on(event, handler) {
+        if (!this._listeners[event]) {
+            this._listeners[event] = new Set();
+        }
+        this._listeners[event].add(handler);
+        return () => this._listeners[event].delete(handler);
+    },
+    _emit(event, payload) {
+        const handlers = this._listeners[event];
+        if (!handlers) return;
+        handlers.forEach(handler => {
+            try {
+                handler(payload);
+            } catch (e) {
+                stateLogger.error("StateStore handler error", e, event);
+            }
+        });
+    },
 
     getConnectionState() {
         return this._connectionState;
@@ -23,67 +42,87 @@ const StateStore = {
     setConnectionState(value) {
         const previous = this._connectionState;
         this._connectionState = value;
+        this._emit("connectionState", { previous, value });
         return previous;
     },
     getSavedCredentials() {
         return this._savedCredentials;
     },
     setSavedCredentials(value) {
+        const previous = this._savedCredentials;
         this._savedCredentials = value;
+        this._emit("savedCredentials", { previous, value });
     },
     isLoginShown() {
         return this._loginShown;
     },
     setLoginShown(value) {
+        const previous = this._loginShown;
         this._loginShown = value;
+        this._emit("loginShown", { previous, value });
     },
     isLoginPromptAllowed() {
         return this._allowLoginPrompt;
     },
     setAllowLoginPrompt(value) {
+        const previous = this._allowLoginPrompt;
         this._allowLoginPrompt = value;
+        this._emit("allowLoginPrompt", { previous, value });
     },
     isLoginModalScheduled() {
         return this._loginModalScheduled;
     },
     setLoginModalScheduled(value) {
+        const previous = this._loginModalScheduled;
         this._loginModalScheduled = value;
+        this._emit("loginModalScheduled", { previous, value });
     },
     isReconnecting() {
         return this._isReconnecting;
     },
     setIsReconnecting(value) {
+        const previous = this._isReconnecting;
         this._isReconnecting = value;
+        this._emit("isReconnecting", { previous, value });
     },
     isSessionInitialized() {
         return this._sessionInitialized;
     },
     setSessionInitialized(value) {
+        const previous = this._sessionInitialized;
         this._sessionInitialized = value;
+        this._emit("sessionInitialized", { previous, value });
     },
     isConnectRequested() {
         return this._connectRequested;
     },
     setConnectRequested(value) {
+        const previous = this._connectRequested;
         this._connectRequested = value;
+        this._emit("connectRequested", { previous, value });
     },
     isReconnectAllowed() {
         return this._allowReconnect;
     },
     setAllowReconnect(value) {
+        const previous = this._allowReconnect;
         this._allowReconnect = value;
+        this._emit("allowReconnect", { previous, value });
     },
     isManualDisconnect() {
         return this._manualDisconnect;
     },
     setManualDisconnect(value) {
+        const previous = this._manualDisconnect;
         this._manualDisconnect = value;
+        this._emit("manualDisconnect", { previous, value });
     },
     resetSessionFlags() {
         this._savedCredentials = null;
         this._loginShown = false;
         this._allowLoginPrompt = false;
         this._loginModalScheduled = false;
+        this._emit("sessionFlagsReset", {});
     }
 };
 
