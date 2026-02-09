@@ -103,7 +103,7 @@ const ModalManager = {
             this.confirmShown = false;
 
             // Restaura estado da UI
-            updateConnectionState(currentState);
+            updateConnectionState(StateStore.getConnectionState());
         } catch (e) {
             modalsLogger.error("Error hiding confirm modal", e);
         }

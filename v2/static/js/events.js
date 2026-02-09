@@ -90,7 +90,7 @@ const EventManager = {
 
                 // Habilita o input para login manual
                 const input = getElement(CONFIG.SELECTORS.input);
-                if (input && currentState === "CONNECTED") {
+                if (input && StateStore.getConnectionState() === "CONNECTED") {
                     input.disabled = false;
                     input.focus();
                 }
@@ -112,7 +112,7 @@ const EventManager = {
 
                     // Habilita o input para login manual
                     const input = getElement(CONFIG.SELECTORS.input);
-                    if (input && currentState === "CONNECTED") {
+                    if (input && StateStore.getConnectionState() === "CONNECTED") {
                         input.disabled = false;
                         input.focus();
                     }
@@ -153,7 +153,7 @@ const EventManager = {
 
                 // Habilita o input para login manual
                 const input = getElement(CONFIG.SELECTORS.input);
-                if (input && currentState === "CONNECTED") {
+                if (input && StateStore.getConnectionState() === "CONNECTED") {
                     input.disabled = false;
                     input.focus();
                 }
@@ -179,26 +179,18 @@ const EventManager = {
         eventsLogger.log("Login button clicked - initiating connection");
 
         // Reseta flags de desconexão manual ao tentar conectar
-        if (typeof isManualDisconnect !== 'undefined') {
-            isManualDisconnect = false;
-        }
-        if (typeof allowReconnect !== 'undefined') {
-            allowReconnect = true;
-        }
+        StateStore.setManualDisconnect(false);
+        StateStore.setAllowReconnect(true);
 
         // Marca que o usuário solicitou conexão (usado após init_ok)
-        if (typeof connectRequested !== 'undefined') {
-            connectRequested = true;
-        }
+        StateStore.setConnectRequested(true);
 
         // Reseta flag de dismissal do modal para nova conexão
         ModalManager.resetLoginModalDismissal();
 
-        allowLoginPrompt = true;
-        loginShown = false;
-        if (typeof loginModalScheduled !== 'undefined') {
-            loginModalScheduled = false;
-        }
+        StateStore.setAllowLoginPrompt(true);
+        StateStore.setLoginShown(false);
+        StateStore.setLoginModalScheduled(false);
         StateManager.saveLoginState();
 
         if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {
@@ -218,19 +210,15 @@ const EventManager = {
         eventsLogger.log("Disconnect button clicked - closing connection");
 
         // Marca como desconexão manual para não tentar reconectar
-        if (typeof isManualDisconnect !== 'undefined') {
-            isManualDisconnect = true;
-        }
-        if (typeof allowReconnect !== 'undefined') {
-            allowReconnect = false;
-        }
+        StateStore.setManualDisconnect(true);
+        StateStore.setAllowReconnect(false);
 
         if (typeof ws !== 'undefined' && ws !== null && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: "disconnect" }));
         }
-        allowLoginPrompt = false;
-        loginShown = false;
-        savedCredentials = null;
+        StateStore.setAllowLoginPrompt(false);
+        StateStore.setLoginShown(false);
+        StateStore.setSavedCredentials(null);
         StateManager.clearSessionState();
         ModalManager.hideLoginModal();
         ModalManager.resetLoginModalDismissal();
@@ -242,8 +230,8 @@ const EventManager = {
     },
 
     handleSendClick() {
-        if (currentState !== "CONNECTED") {
-            eventsLogger.warn("Send blocked: state is not CONNECTED", currentState);
+        if (StateStore.getConnectionState() !== "CONNECTED") {
+            eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
             return;
         }
 
@@ -289,9 +277,9 @@ const EventManager = {
         }
 
         eventsLogger.log("Login form: saving credentials");
-        savedCredentials = { username, password };
+        StateStore.setSavedCredentials({ username, password });
         StorageManager.saveCredentials(username, password, saveSession);
-        loginShown = true;
+        StateStore.setLoginShown(true);
         StateManager.saveLoginState();
         sendLogin(username, password);
 

@@ -12,16 +12,10 @@ let lastCommandSent = "";
 let reconnectAttempts = 0;
 let reconnectTimeout = null;
 let isManualDisconnect = false;
-let allowReconnect = false;
-let connectRequested = false;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY_MS = 3000;
 
-// Flag para indicar reconexão
-window.isReconnecting = false;
-
-// Flag para indicar que a sessão foi inicializada (init_ok recebido)
-window.sessionInitialized = false;
+// Flags de reconexão e sessão ficam no StateStore
 
 const OUTPUT_MAX_LINES = 2000;
 
@@ -74,13 +68,13 @@ function connectWebSocket() {
  * Tenta reconectar após falha
  */
 function scheduleReconnect() {
-    if (isManualDisconnect) {
+    if (StateStore.isManualDisconnect()) {
         wsLogger.log("Manual disconnect - not reconnecting");
-        allowReconnect = false;
+        StateStore.setAllowReconnect(false);
         return;
     }
 
-    if (!allowReconnect) {
+    if (!StateStore.isReconnectAllowed()) {
         wsLogger.log("Auto-reconnect not allowed - waiting for user action");
         return;
     }
@@ -98,7 +92,7 @@ function scheduleReconnect() {
 
     reconnectTimeout = setTimeout(() => {
         wsLogger.log(`Reconnect attempt ${reconnectAttempts}`);
-        window.isReconnecting = true;
+        StateStore.setIsReconnecting(true);
         connectWebSocket();
     }, delay);
 }
@@ -115,8 +109,8 @@ function handleWebSocketOpen() {
     }
 
     // Se conectou com sucesso, permitir reconexão automática em caso de queda
-    if (!isManualDisconnect) {
-        allowReconnect = true;
+    if (!StateStore.isManualDisconnect()) {
+        StateStore.setAllowReconnect(true);
     }
 
     // Obtém ou cria publicId e owner token
@@ -200,13 +194,13 @@ function handleWebSocketClose(event) {
 
         // Limpa publicId e token para forçar geração de novos
         StorageManager.clearSession();
-        allowReconnect = false;
+        StateStore.setAllowReconnect(false);
         updateConnectionState("DISCONNECTED");
-    } else if (isManualDisconnect) {
+    } else if (StateStore.isManualDisconnect()) {
         sysMessage = "[SISTEMA] Desconectado";
         // Limpa sessão em desconexão manual
         StorageManager.clearSession();
-        allowReconnect = false;
+        StateStore.setAllowReconnect(false);
         updateConnectionState("DISCONNECTED");
     } else {
         // Conexão perdida involuntariamente
@@ -238,7 +232,7 @@ function handleInitOkMessage(msg) {
     }
 
     // Marca sessão como inicializada após init_ok
-    window.sessionInitialized = true;
+    StateStore.setSessionInitialized(true);
 
     // Exibe feedback baseado no status
     if (msg.status === "created") {
@@ -249,7 +243,8 @@ function handleInitOkMessage(msg) {
     }
 
     // Se há credenciais salvas, estamos reconectando
-    if (savedCredentials && window.isReconnecting) {
+    const savedCredentials = StateStore.getSavedCredentials();
+    if (savedCredentials && StateStore.isReconnecting()) {
         wsLogger.log("Detected reconnection with saved credentials - requesting connection");
         setTimeout(() => {
             ws.send(JSON.stringify({ type: "connect" }));
@@ -257,8 +252,8 @@ function handleInitOkMessage(msg) {
     }
 
     // Se o usuário clicou em conectar antes do init_ok, envia connect agora
-    if (connectRequested && !window.isReconnecting) {
-        connectRequested = false;
+    if (StateStore.isConnectRequested() && !StateStore.isReconnecting()) {
+        StateStore.setConnectRequested(false);
         wsLogger.log("Connect requested before init_ok - sending connect");
         setTimeout(() => {
             if (ws && ws.readyState === WebSocket.OPEN) {
