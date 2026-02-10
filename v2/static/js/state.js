@@ -1,0 +1,342 @@
+/**
+ * state.js - Gerenciamento de estado da aplicação
+ * Mantém apenas lógica de estado, delegando armazenamento e modais para outros módulos
+ */
+
+const stateLogger = createLogger("state");
+
+const StateStore = {
+    _listeners: {},
+    _connectionState: "DISCONNECTED",
+    _savedCredentials: null,
+    _loginShown: false,
+    _allowLoginPrompt: false,
+    _loginModalScheduled: false,
+    _isReconnecting: false,
+    _sessionInitialized: false,
+    _connectRequested: false,
+    _allowReconnect: false,
+    _manualDisconnect: false,
+    on(event, handler) {
+        if (!this._listeners[event]) {
+            this._listeners[event] = new Set();
+        }
+        this._listeners[event].add(handler);
+        // Retorna função de remoção para facilitar cleanup
+        return () => this._listeners[event].delete(handler);
+    },
+
+    /**
+     * Remove um handler específico de um evento.
+     * Alternativa explícita ao callback retornado por on().
+     */
+    off(event, handler) {
+        const handlers = this._listeners[event];
+        if (handlers) {
+            handlers.delete(handler);
+            if (handlers.size === 0) {
+                delete this._listeners[event];
+            }
+        }
+    },
+
+    /**
+     * Remove todos os listeners. Se 'event' for informado,
+     * remove apenas os listeners daquele evento.
+     */
+    removeAllListeners(event) {
+        if (event) {
+            delete this._listeners[event];
+        } else {
+            this._listeners = {};
+        }
+    },
+
+    _emit(event, payload) {
+        const handlers = this._listeners[event];
+        if (!handlers) return;
+        handlers.forEach(handler => {
+            try {
+                handler(payload);
+            } catch (e) {
+                stateLogger.error("StateStore handler error", e, event);
+            }
+        });
+    },
+
+    getConnectionState() {
+        return this._connectionState;
+    },
+    setConnectionState(value) {
+        const previous = this._connectionState;
+        this._connectionState = value;
+        this._emit("connectionState", { previous, value });
+        return previous;
+    },
+    getSavedCredentials() {
+        return this._savedCredentials;
+    },
+    setSavedCredentials(value) {
+        const previous = this._savedCredentials;
+        this._savedCredentials = value;
+        this._emit("savedCredentials", { previous, value });
+    },
+    isLoginShown() {
+        return this._loginShown;
+    },
+    setLoginShown(value) {
+        const previous = this._loginShown;
+        this._loginShown = value;
+        this._emit("loginShown", { previous, value });
+    },
+    isLoginPromptAllowed() {
+        return this._allowLoginPrompt;
+    },
+    setAllowLoginPrompt(value) {
+        const previous = this._allowLoginPrompt;
+        this._allowLoginPrompt = value;
+        this._emit("allowLoginPrompt", { previous, value });
+    },
+    isLoginModalScheduled() {
+        return this._loginModalScheduled;
+    },
+    setLoginModalScheduled(value) {
+        const previous = this._loginModalScheduled;
+        this._loginModalScheduled = value;
+        this._emit("loginModalScheduled", { previous, value });
+    },
+    isReconnecting() {
+        return this._isReconnecting;
+    },
+    setIsReconnecting(value) {
+        const previous = this._isReconnecting;
+        this._isReconnecting = value;
+        this._emit("isReconnecting", { previous, value });
+    },
+    isSessionInitialized() {
+        return this._sessionInitialized;
+    },
+    setSessionInitialized(value) {
+        const previous = this._sessionInitialized;
+        this._sessionInitialized = value;
+        this._emit("sessionInitialized", { previous, value });
+    },
+    isConnectRequested() {
+        return this._connectRequested;
+    },
+    setConnectRequested(value) {
+        const previous = this._connectRequested;
+        this._connectRequested = value;
+        this._emit("connectRequested", { previous, value });
+    },
+    isReconnectAllowed() {
+        return this._allowReconnect;
+    },
+    setAllowReconnect(value) {
+        const previous = this._allowReconnect;
+        this._allowReconnect = value;
+        this._emit("allowReconnect", { previous, value });
+    },
+    isManualDisconnect() {
+        return this._manualDisconnect;
+    },
+    setManualDisconnect(value) {
+        const previous = this._manualDisconnect;
+        this._manualDisconnect = value;
+        this._emit("manualDisconnect", { previous, value });
+    },
+    resetSessionFlags() {
+        this._savedCredentials = null;
+        this._loginShown = false;
+        this._allowLoginPrompt = false;
+        this._loginModalScheduled = false;
+        this._emit("sessionFlagsReset", {});
+    }
+};
+
+// Gerenciador de estado
+const StateManager = {
+    loadSessionState() {
+        try {
+            StateStore.setSavedCredentials(StorageManager.getCredentials());
+            const wasLoggedIn = StorageManager.isLoggedIn();
+            const allowLogin = StorageManager.isAllowLoginPrompt();
+
+            StateStore.setAllowLoginPrompt(allowLogin);
+            StateStore.setLoginShown(wasLoggedIn);
+
+            stateLogger.log("Loaded session state", { wasLoggedIn, allowLogin });
+        } catch (e) {
+            stateLogger.error("Error loading session state", e);
+        }
+    },
+
+    saveLoginState() {
+        try {
+            StorageManager.setLoggedIn(StateStore.isLoginShown());
+            StorageManager.setAllowLoginPrompt(StateStore.isLoginPromptAllowed());
+            stateLogger.log("Saved login state");
+        } catch (e) {
+            stateLogger.error("Error saving login state", e);
+        }
+    },
+
+    saveConnectionState() {
+        // Não salva mais o estado de conexão para evitar reconexão automática
+        // A conexão agora é sempre manual através do botão Login
+    },
+
+    clearSessionState() {
+        try {
+            StorageManager.clearAll();
+            StateStore.resetSessionFlags();
+            stateLogger.log("Cleared session state");
+        } catch (e) {
+            stateLogger.error("Error clearing session state", e);
+        }
+    }
+};
+
+// Atualiza interface baseada no estado
+function updateConnectionState(state) {
+    const previousState = StateStore.setConnectionState(state);
+    stateLogger.log("State change", previousState, "->", state);
+
+    switch (state) {
+        case "DISCONNECTED":
+            UIHelpers.setStatusIndicator({ text: "Desconectado" });
+            UIHelpers.setReconnectControls({ visible: false });
+            UIHelpers.setButtonsState({
+                loginDisabled: false,
+                disconnectDisabled: true,
+                sendDisabled: true,
+                inputDisabled: true
+            });
+            if (!StateStore.isReconnecting() && StateStore.isSessionInitialized()) {
+                StateManager.clearSessionState();
+            }
+            break;
+
+        case "CONNECTING":
+            UIHelpers.setStatusIndicator({
+                text: "Conectando...",
+                stateClass: CONFIG.CLASSES.connecting
+            });
+            UIHelpers.setReconnectControls({ visible: false });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: true,
+                sendDisabled: true,
+                inputDisabled: true
+            });
+            break;
+
+        case "RECONNECTING":
+            UIHelpers.setStatusIndicator({
+                text: "Reconectando...",
+                stateClass: CONFIG.CLASSES.connecting
+            });
+            UIHelpers.setReconnectControls({ visible: true });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: true,
+                sendDisabled: true,
+                inputDisabled: true
+            });
+            break;
+
+        case "CONNECTED":
+            UIHelpers.setStatusIndicator({
+                text: "Conectado",
+                stateClass: CONFIG.CLASSES.connected
+            });
+            UIHelpers.setReconnectControls({ visible: false });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: false,
+                sendDisabled: false,
+                inputDisabled: false
+            });
+            const input = getElement(CONFIG.SELECTORS.input);
+            if (input) input.focus();
+
+            // Se estamos reconectando, tenta fazer login automaticamente
+            const savedCredentials = StateStore.getSavedCredentials();
+            if (StateStore.isReconnecting() && savedCredentials && !StateStore.isLoginShown()) {
+                stateLogger.log("Reconnecting - attempting auto-login");
+                setTimeout(() => {
+                    sendLogin(savedCredentials.username, savedCredentials.password);
+                    StateStore.setLoginShown(true);
+                    StateManager.saveLoginState();
+                    // Envia comandos enfileirados durante a reconexão
+                    setTimeout(() => {
+                        if (typeof flushPendingCommands === "function") flushPendingCommands();
+                    }, CONFIG.TIMEOUTS.reconnectDelay);
+                }, CONFIG.TIMEOUTS.reconnectDelay);
+                StateStore.setIsReconnecting(false);
+            } else if (StateStore.isReconnecting() && !savedCredentials) {
+                StateStore.setIsReconnecting(false);
+                // Sem credenciais, flush imediato (pode ser sessão sem login)
+                if (typeof flushPendingCommands === "function") flushPendingCommands();
+            }
+            break;
+
+        case "AWAITING_LOGIN":
+            UIHelpers.setStatusIndicator({
+                text: "Aguardando login",
+                stateClass: CONFIG.CLASSES.connected
+            });
+            UIHelpers.setReconnectControls({ visible: false });
+            UIHelpers.setButtonsState({
+                loginDisabled: true,
+                disconnectDisabled: false,
+                sendDisabled: true,
+                inputDisabled: true
+            });
+            break;
+    }
+}
+
+// Verifica e exibe modal de login
+function checkAndShowLogin() {
+    stateLogger.log("Check login display", "state:", StateStore.getConnectionState(), "shown:", StateStore.isLoginShown());
+
+    if (!StateStore.isLoginPromptAllowed()) {
+        stateLogger.warn("Login display blocked: prompt not allowed");
+        return;
+    }
+
+    if (!StateStore.isLoginShown() && StateStore.getConnectionState() === "CONNECTED") {
+        const savedCredentials = StateStore.getSavedCredentials();
+        if (savedCredentials) {
+            stateLogger.log("Using saved credentials for login");
+            sendLogin(savedCredentials.username, savedCredentials.password);
+            StateStore.setLoginShown(true);
+        } else {
+            if (StateStore.isLoginModalScheduled()) {
+                stateLogger.warn("Login modal already scheduled");
+                return;
+            }
+            StateStore.setLoginModalScheduled(true);
+            StateStore.setLoginShown(true);
+            setTimeout(() => {
+                ModalManager.showLoginModal();
+            }, CONFIG.TIMEOUTS.loginModalDelay);
+        }
+    } else if (StateStore.isLoginShown()) {
+        stateLogger.warn("Login display blocked: already shown");
+    } else {
+        stateLogger.warn("Login display blocked: state is not CONNECTED");
+    }
+}
+
+// Inicialização: carrega estado salvo quando a página carrega
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        StateManager.loadSessionState();
+        stateLogger.log("Session state loaded on DOMContentLoaded");
+    });
+} else {
+    StateManager.loadSessionState();
+    stateLogger.log("Session state loaded immediately");
+}
