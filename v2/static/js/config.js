@@ -3,16 +3,39 @@
  * Constantes, seletores DOM, padrões e configurações globais
  */
 
+/**
+ * Lê configuração de <meta name="mud-*"> tags do HTML.
+ * Permite externalizar valores sem alterar JS.
+ */
+function _readMeta(name, fallback) {
+    const el = document.querySelector(`meta[name="${name}"]`);
+    return el ? el.getAttribute("content") : fallback;
+}
+
 const CONFIG = {
     // URLs e endpoints
-    WS_URL: `ws://${location.host}/ws`,
+    WS: {
+        url: _readMeta("mud-ws-url", `ws://${location.host}/ws`),
+        reconnectMaxAttempts: 5,
+        reconnectBaseDelayMs: 1000,
+        reconnectMaxDelayMs: 30000,
+        backendReadyDelayMs: 500,
+        messageMeta: {
+            client: "web"
+        }
+    },
+
+    // Histórico de comandos (setas ↑/↓)
+    COMMAND_HISTORY_MAX: 50,
 
     // Chaves de armazenamento
     STORAGE_KEYS: {
         CREDENTIALS: 'mud_credentials',
         LOGGED_IN: 'mud_logged_in',
         ALLOW_LOGIN: 'mud_allow_login',
-        WAS_CONNECTED: 'mud_was_connected'
+        WAS_CONNECTED: 'mud_was_connected',
+        PUBLIC_ID: 'mud_public_id',
+        OWNER: 'mud_owner'
     },
 
     // Seletores DOM
@@ -27,6 +50,10 @@ const CONFIG = {
         btnClear: "#btnClear",
         btnSend: "#btnSend",
         btnCancelLogin: "#btnCancelLogin",
+        btnCancelReconnect: "#btnCancelReconnect",
+
+        // Reconexao
+        reconnectStatus: "#reconnectStatus",
 
         // Status
         statusDot: "#statusDot",
@@ -68,9 +95,18 @@ const CONFIG = {
     // Timeouts
     TIMEOUTS: {
         loginModalDelay: 500,
-        reconnectDelay: 1000,
-        backendReadyDelay: 500
+        reconnectDelay: 1000
     },
+
+    // Output
+    OUTPUT_MAX_LINES: 2000,
+    OUTPUT_HISTORY_MAX_LINES: 2000,
+
+    // Fila de comandos pendentes (quando desconectado temporariamente)
+    COMMAND_QUEUE_MAX: 10,
+
+    // Menu interativo
+    MENU_TIMEOUT_MS: 2500,
 
     // Cookie config
     COOKIE_EXPIRY_DAYS: 30
@@ -86,6 +122,15 @@ function getElement(selector) {
     return DOM_CACHE[selector];
 }
 
+function invalidateElementCache(selector) {
+    if (selector) {
+        delete DOM_CACHE[selector];
+    } else {
+        Object.keys(DOM_CACHE).forEach(key => delete DOM_CACHE[key]);
+    }
+}
+
 function getAllElements(selector) {
     return document.querySelectorAll(selector);
 }
+

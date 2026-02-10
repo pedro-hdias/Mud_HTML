@@ -36,7 +36,7 @@ const PromptDetector = {
             return trimmed;
         } catch (e) {
             promptsLogger.error("Error building confirm message", e);
-            return trimmed;
+            return (line || "").trim();
         }
     }
 };

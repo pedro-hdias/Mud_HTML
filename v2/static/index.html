@@ -5,6 +5,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web MUD Client</title>
+    <!-- Configurações externalizáveis via meta tags (override padrões de config.js) -->
+    <!-- <meta name="mud-ws-url" content="ws://localhost:8000/ws"> -->
+    <!-- <meta name="mud-log-level" content="warn"> -->
+    <link rel="icon" id="favicon" type="image/svg+xml"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23666'/></svg>">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 
@@ -20,6 +25,11 @@
             <div id="statusDot"></div>
             <span id="statusText">Desconectado</span>
         </div>
+
+        <div id="reconnectStatus" aria-live="polite" hidden>
+            <span>Reconectando...</span>
+            <button id="btnCancelReconnect" type="button">Cancelar tentativa</button>
+        </div>
     </div>
 
     <!-- Área de output -->
@@ -33,10 +43,14 @@
         <button id="btnSend" aria-label="Enviar comando" title="Enviar comando" disabled>Enviar</button>
     </div>
 
+    <div id="inputHints">Enter para enviar, ; para múltiplos</div>
+
     <!-- Modal de Login -->
     <div id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
         <form id="loginForm">
             <h2 id="loginTitle">Entrar no jogo</h2>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">O servidor está aguardando suas credenciais.
+                Preencha abaixo ou clique em "Digitar Manualmente" para fazer login direto no terminal.</p>
 
             <label for="username">Nome de usuário:</label>
             <input type="text" id="username" name="username" required autocomplete="username" />
@@ -50,7 +64,8 @@
             </div>
 
             <button type="submit">Entrar</button>
-            <button type="button" id="btnCancelLogin" style="margin-top: 10px;">Cancelar</button>
+            <button type="button" id="btnCancelLogin" style="margin-top: 10px;"
+                title="Fechar popup e digitar login manualmente no terminal">Digitar Manualmente</button>
         </form>
     </div>
 
@@ -74,7 +89,6 @@
     <script src="/static/js/modals.js"></script>
     <script src="/static/js/state.js"></script>
     <script src="/static/js/menu.js"></script>
-    <script src="/static/js/menu-test.js"></script>
     <script src="/static/js/events.js"></script>
     <script src="/static/js/ui.js"></script>
     <script src="/static/js/ws.js"></script>

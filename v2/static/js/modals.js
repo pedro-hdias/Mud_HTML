@@ -7,10 +7,17 @@ const modalsLogger = createLogger("modals");
 
 const ModalManager = {
     confirmShown: false,
+    loginModalDismissed: false, // Flag para rastrear se o usuário cancelou o popup
 
     // Modal de Login
     showLoginModal() {
         try {
+            // Se o usuário já cancelou o popup, não mostra novamente
+            if (this.loginModalDismissed) {
+                modalsLogger.log("Login modal dismissed by user - not showing again");
+                return;
+            }
+
             const loginModal = getElement(CONFIG.SELECTORS.loginModal);
             const usernameInput = getElement(CONFIG.SELECTORS.usernameInput);
 
@@ -37,6 +44,21 @@ const ModalManager = {
         } catch (e) {
             modalsLogger.error("Error hiding login modal", e);
         }
+    },
+
+    dismissLoginModal() {
+        try {
+            this.loginModalDismissed = true;
+            this.hideLoginModal();
+            modalsLogger.log("Login modal dismissed - will not show automatically again");
+        } catch (e) {
+            modalsLogger.error("Error dismissing login modal", e);
+        }
+    },
+
+    resetLoginModalDismissal() {
+        this.loginModalDismissed = false;
+        modalsLogger.log("Login modal dismissal reset");
     },
     showConfirmModal(message) {
         try {
@@ -81,7 +103,7 @@ const ModalManager = {
             this.confirmShown = false;
 
             // Restaura estado da UI
-            updateConnectionState(currentState);
+            updateConnectionState(StateStore.getConnectionState());
         } catch (e) {
             modalsLogger.error("Error hiding confirm modal", e);
         }
