@@ -38,6 +38,11 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 def index():
     return FileResponse("static/index.html")
 
+@app.get("/audio")
+def audio_page():
+    """Página de teste do engine de áudio"""
+    return FileResponse("static/audio.html")
+
 @app.get("/sessions")
 def sessions_page(request: Request):
     """Página de debug para visualizar sessões ativas"""
