@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web MUD Client</title>
     <!-- Configurações externalizáveis via meta tags (override padrões de config.js) -->
-    <!-- <meta name="mud-ws-url" content="ws://localhost:8000/ws"> -->
+    <!-- <meta name="mud-ws-url" content="ws://localhost:80/ws"> -->
     <!-- <meta name="mud-log-level" content="warn"> -->
     <link rel="icon" id="favicon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%23666'/></svg>">
@@ -20,6 +20,8 @@
         <button id="btnLogin" aria-label="Conectar ao servidor">Login</button>
         <button id="btnDisconnect" aria-label="Desconectar do servidor" disabled>Desconectar</button>
         <button id="btnClear" aria-label="Limpar tela" title="Limpar todo o histórico de saída">Limpar Tela</button>
+        <button id="btnSoundToggle" aria-label="Ligar/desligar áudio automático"
+            title="Ativar/desativar reprodução automática de sons">🔊 Áudio: OFF</button>
 
         <div id="statusIndicator">
             <div id="statusDot"></div>
@@ -91,6 +93,8 @@
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/events.js"></script>
     <script src="/static/js/ui.js"></script>
+    <script src="/static/js/audio.js"></script>
+    <script src="/static/js/sound-handler.js"></script>
     <script src="/static/js/ws.js"></script>
 
 </body>

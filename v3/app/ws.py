@@ -27,7 +27,6 @@ logger = get_logger("ws")
 async def websocket_endpoint(ws: WebSocket):
     """Endpoint WebSocket - gerencia conexões de clientes"""
     await ws.accept()
-    logger.debug("WebSocket accepted")
     
     session = None
     public_id = None
@@ -35,7 +34,6 @@ async def websocket_endpoint(ws: WebSocket):
     try:
         # Aguarda mensagem inicial com publicId
         msg = await ws.receive_text()
-        logger.debug(f"Received initial message: {msg}")
 
         try:
             parsed = parse_message(msg)
@@ -87,11 +85,9 @@ async def websocket_endpoint(ws: WebSocket):
                 # Envia o estado atual ao cliente
                 log_state_read(session.state, f"send_state_to_client_{public_id}")
                 await ws.send_json(make_message("state", {"value": session.state.value}))
-                logger.debug(f"Sent current state to client: {session.state.value}")
                 
                 # Envia o histórico se existir
                 if session.history:
-                    logger.debug(f"Sending history to client ({len(session.history)} chars)")
                     await ws.send_json(make_message("history", {"content": session.history}))
                 
                 # Confirma inicialização com ownership token
@@ -117,7 +113,6 @@ async def websocket_endpoint(ws: WebSocket):
         # Loop de mensagens
         while True:
             msg = await ws.receive_text()
-            logger.debug(f"Session {public_id}: Received message")
 
             # Rate limiting check
             now = time.monotonic()

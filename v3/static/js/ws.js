@@ -142,6 +142,10 @@ function scheduleReconnect() {
 function handleWebSocketOpen() {
     wsLogger.log("WebSocket opened");
 
+    if (window.SoundInterceptor && typeof window.SoundInterceptor.init === "function") {
+        window.SoundInterceptor.init();
+    }
+
     if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
         reconnectTimeout = null;
@@ -192,6 +196,9 @@ function handleWebSocketMessage(event) {
                 break;
             case "system":
                 handleSystemMessage(msg.payload || {});
+                break;
+            case "sound":
+                handleSoundMessage(msg.payload || {});
                 break;
             case "error":
                 handleErrorMessage(msg.payload || {});
@@ -324,6 +331,19 @@ function handleSessionInvalidMessage(payload) {
     // O handler onclose cuidará da limpeza e reconexão
 }
 
+function handleSoundMessage(payload) {
+    if (!payload.events || !Array.isArray(payload.events)) {
+        wsLogger.warn("Invalid sound payload", payload);
+        return;
+    }
+
+    if (window.SoundHandler && typeof window.SoundHandler.handleSoundEvents === "function") {
+        window.SoundHandler.handleSoundEvents(payload.events);
+    } else {
+        wsLogger.warn("SoundHandler not available");
+    }
+}
+
 function handleStateMessage(payload) {
     updateConnectionState(payload.value);
 }
@@ -357,6 +377,10 @@ function handleLineMessage(payload) {
 
     PromptDetector.setLastLine(payload.content);
 
+    if (window.SoundInterceptor && typeof window.SoundInterceptor.handleLine === "function") {
+        window.SoundInterceptor.handleLine(payload.content);
+    }
+
     // Detecta quando o servidor está aguardando input/login
     const lineText = payload.content.toLowerCase();
     const hasInputPrompt = lineText.includes("[input]") ||
@@ -365,8 +389,8 @@ function handleLineMessage(payload) {
         lineText.includes("password:") ||
         lineText.includes("senha:");
 
-    if (hasInputPrompt || lineText.includes("play") || lineText.includes("enter") ||
-        (StateStore.getConnectionState() === "CONNECTED" && output && output.children.length > 3)) {
+    // Apenas chama checkAndShowLogin se detectar explicitamente um prompt de entrada
+    if (hasInputPrompt) {
         checkAndShowLogin();
     }
 
