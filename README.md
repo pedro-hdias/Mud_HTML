@@ -7,10 +7,10 @@ Cliente web para jogar MUD via navegador.
 A forma mais rápida de rodar o cliente:
 
 ```bash
-docker run -p 8000:8000 ghcr.io/pedro-hdias/mud_html:latest
+docker run -p 80:80 ghcr.io/pedro-hdias/mud_html:latest
 ```
 
-Acesse: [http://localhost:8000](http://localhost:8000)
+Acesse: [http://localhost:80](http://localhost:80)
 
 ### Versões disponíveis:
 - `latest` - Última versão estável
@@ -26,14 +26,14 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Acesse: [http://localhost:8000](http://localhost:8000)
+Acesse: [http://localhost:80](http://localhost:80)
 
 ## 🐳 Como buildar com Docker
 
 ```bash
 cd v2  # ou v1
 docker build -t mudclient .
-docker run -d -p 8000:8000 mudclient
+docker run -d -p 80:80 mudclient
 ```
 
-Acesse: [http://localhost:8000](http://localhost:8000)
+Acesse: [http://localhost:80](http://localhost:80)
