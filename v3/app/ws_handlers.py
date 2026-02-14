@@ -24,7 +24,6 @@ async def handle_connect(session: MudSession, ws: WebSocket, public_id: str, ses
             session.reader_task = asyncio.create_task(session.mud_reader())
         else:
             await session.broadcast_state(ConnectionState.DISCONNECTED)
-            logger.debug(f"Session {public_id}: MUD connection failed")
             await ws.send_json(make_message("system", {"message": "Falha ao conectar no servidor"}))
 
 
@@ -38,7 +37,6 @@ async def handle_disconnect(session: MudSession, ws: WebSocket, public_id: str, 
 
         # Envia comando quit
         try:
-            logger.debug(f"Session {public_id}: Sending quit to MUD")
             await session.send_to_mud(b"quit\n")
         except Exception:
             logger.exception(f"Session {public_id}: Failed to send quit to MUD")
@@ -61,7 +59,6 @@ async def handle_login(session: MudSession, ws: WebSocket, public_id: str, paylo
 
         # Envia sequência de login
         try:
-            logger.debug(f"Session {public_id}: Sending login sequence to MUD")
             await session.send_to_mud(b"p\n")
             await asyncio.sleep(0.1)
             await session.send_to_mud((username + "\n").encode())
@@ -82,7 +79,6 @@ async def handle_command(session: MudSession, ws: WebSocket, public_id: str, pay
             logger.warning(f"Session {public_id}: Command too long ({len(command)} chars), truncated")
             command = command[:512]
 
-        logger.debug(f"Session {public_id}: Sending command to MUD")
         await session.send_to_mud((command + "\n").encode())
 
 
@@ -90,5 +86,4 @@ async def handle_raw_command(session: MudSession, public_id: str, raw_msg: str) 
     """Processa comando bruto (backward compatibility)"""
     log_state_read(session.state, f"raw_command_{public_id}")
     if session.writer and session.state == ConnectionState.CONNECTED:
-        logger.debug(f"Session {public_id}: Sending raw command to MUD")
         await session.send_to_mud((raw_msg + "\n").encode())

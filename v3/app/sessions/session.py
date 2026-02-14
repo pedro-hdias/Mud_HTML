@@ -22,6 +22,7 @@ from ..config import (
 )
 from ..ws_messages import make_message
 from ..logger import get_logger
+from ..sounds import get_sound_engine
 
 logger = get_logger("session")
 
@@ -41,6 +42,7 @@ class MudSession:
         self.state = ConnectionState.DISCONNECTED
         self.last_activity = datetime.now()
         self.manual_disconnect = False  # Flag para desconexão intencional
+        self.sound_engine = get_sound_engine()
         
         logger.info(f"Session created: {public_id} (owner: {self.owner_token[:8]}...)")
     
@@ -52,13 +54,11 @@ class MudSession:
         """Adiciona um cliente WebSocket a esta sessão"""
         self.websocket_clients.add(ws)
         self.touch()
-        logger.debug(f"Session {self.public_id}: WebSocket added (total: {len(self.websocket_clients)})")
     
     def remove_websocket(self, ws: WebSocket):
         """Remove um cliente WebSocket desta sessão"""
         if ws in self.websocket_clients:
             self.websocket_clients.remove(ws)
-            logger.debug(f"Session {self.public_id}: WebSocket removed (remaining: {len(self.websocket_clients)})")
     
     def has_clients(self) -> bool:
         """Verifica se a sessão tem clientes conectados"""
@@ -75,7 +75,6 @@ class MudSession:
         
         for ws in list(self.websocket_clients):
             try:
-                logger.debug(f"Session {self.public_id}: Sending state {state.value} to client")
                 await ws.send_json(message)
             except Exception as e:
                 logger.warning(f"Session {self.public_id}: Failed to send state to client, marking for removal: {e}")
@@ -102,7 +101,6 @@ class MudSession:
     async def connect_to_mud(self) -> bool:
         """Conecta ao servidor MUD"""
         try:
-            logger.debug(f"Session {self.public_id}: Opening connection to {MUD_HOST}:{MUD_PORT}")
             self.reader, self.writer = await asyncio.open_connection(MUD_HOST, MUD_PORT)
             logger.info(f"Session {self.public_id}: TCP connection established")
             self.touch()
@@ -117,10 +115,8 @@ class MudSession:
         """Fecha a conexão com o MUD"""
         if self.writer:
             try:
-                logger.debug(f"Session {self.public_id}: Closing connection")
                 self.writer.close()
                 await self.writer.wait_closed()
-                logger.debug(f"Session {self.public_id}: Connection closed")
             except Exception as e:
                 logger.exception(f"Session {self.public_id}: Close failed: {e}")
             self.writer = None
@@ -130,7 +126,6 @@ class MudSession:
         """Envia dados para o MUD"""
         if self.writer:
             try:
-                logger.debug(f"Session {self.public_id}: Sending {len(data)} bytes")
                 self.writer.write(data)
                 await self.writer.drain()
                 self.touch()
@@ -154,16 +149,13 @@ class MudSession:
     
     async def disconnect_from_mud(self):
         """Desconecta do MUD e limpa recursos (preserva histórico para reconexão)"""
-        logger.debug(f"Session {self.public_id}: Disconnecting from MUD")
-        
         # Cancela a task de leitura se existir
         if self.reader_task and not self.reader_task.done():
-            logger.debug(f"Session {self.public_id}: Cancelling MUD reader task")
             self.reader_task.cancel()
             try:
                 await self.reader_task
             except asyncio.CancelledError:
-                logger.debug(f"Session {self.public_id}: MUD reader task cancelled")
+                pass
         
         # Fecha a conexão
         await self.close_mud_connection()
@@ -179,18 +171,15 @@ class MudSession:
         """Limpa todos os dados da sessão (usado pelo manager ao remover)"""
         self.history = ""
         self.partial_buffer = ""
-        logger.debug(f"Session {self.public_id}: Session data cleared")
     
     async def mud_reader(self):
         """Task assíncrona que lê dados do MUD continuamente"""
-        logger.debug(f"Session {self.public_id}: MUD reader started")
-        
+
         while True:
             try:
                 data = await self.reader.read(MUD_READ_BUFFER_SIZE)
                 if not data:
                     # Conexão fechada pelo servidor
-                    logger.debug(f"Session {self.public_id}: MUD connection closed by server")
                     await self.disconnect_from_mud()
                     await self.broadcast_message(make_message("system", {
                         "message": "Conexão encerrada pelo servidor"
@@ -198,7 +187,6 @@ class MudSession:
                     break
                 
                 text = data.decode(errors="ignore")
-                logger.debug(f"Session {self.public_id}: Received {len(text)} chars")
                 self.partial_buffer += text
                 self._append_history(text)
                 
@@ -218,7 +206,11 @@ class MudSession:
                             "message": "Desconectado do servidor"
                         }))
                         return
-                    
+
+                    sound_events = self.sound_engine.process_line(line)
+                    if sound_events:
+                        await self.broadcast_message(make_message("sound", {"events": sound_events}))
+
                     await self.broadcast_message(make_message("line", {"content": line}))
 
                 # Se sobrou algo no buffer e parece ser um prompt (curto e sem newline), envia também
@@ -230,7 +222,6 @@ class MudSession:
                         await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
                         self.partial_buffer = ""
                     elif len(self.partial_buffer) < 1024 or parser.detect_input_prompt(self.partial_buffer):
-                        logger.debug(f"Sending partial buffer as prompt: {self.partial_buffer[:50]}")
                         await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
                         # Limpa o buffer pois já enviamos
                         self.partial_buffer = ""

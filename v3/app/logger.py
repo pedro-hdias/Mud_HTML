@@ -55,11 +55,11 @@ def _configure_root_logger():
             mode="a"  # append mode
         )
         file_handler.setFormatter(formatter)
-        file_handler.setLevel(logging.DEBUG)
+        file_handler.setLevel(logging.INFO)
         
         root_logger.addHandler(file_handler)
 
-    root_logger.setLevel(logging.DEBUG)
+    root_logger.setLevel(logging.INFO)
     _LOGGER_CONFIGURED = True
 
 

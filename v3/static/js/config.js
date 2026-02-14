@@ -48,6 +48,7 @@ const CONFIG = {
         btnLogin: "#btnLogin",
         btnDisconnect: "#btnDisconnect",
         btnClear: "#btnClear",
+        btnSoundToggle: "#btnSoundToggle",
         btnSend: "#btnSend",
         btnCancelLogin: "#btnCancelLogin",
         btnCancelReconnect: "#btnCancelReconnect",
