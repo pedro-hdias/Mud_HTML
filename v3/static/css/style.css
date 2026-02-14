@@ -134,6 +134,24 @@ body {
     background: #5a6268;
 }
 
+/* Botão Áudio */
+#btnSoundToggle {
+    background: #6c757d;
+    color: white;
+}
+
+#btnSoundToggle:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+#btnSoundToggle.active {
+    background: #28a745;
+}
+
+#btnSoundToggle.active:hover:not(:disabled) {
+    background: #218838;
+}
+
 /* Área de output */
 #output {
     flex: 1;

@@ -373,3 +373,6 @@ const MudAudio = (() => {
         getActiveSounds,
     };
 })();
+
+// Expõe o MudAudio globalmente para que sound-handler.js possa acessá-lo
+window.MudAudio = MudAudio;
