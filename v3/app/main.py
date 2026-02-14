@@ -15,7 +15,6 @@ logger = get_logger("main")
 @asynccontextmanager
 async def lifespan(app):
     # Startup
-    logger.debug("Application startup")
     await session_manager.invalidate_all_sessions()
     logger.info("Previous sessions invalidated")
     await session_manager.start_cleanup_task()
@@ -24,7 +23,6 @@ async def lifespan(app):
     yield
     
     # Shutdown
-    logger.debug("Application shutdown")
     await session_manager.stop_cleanup_task()
     logger.info("Session cleanup task stopped")
 
@@ -82,7 +80,6 @@ def sessions_status(request: Request):
 @app.websocket("/ws")
 async def websocket_route(websocket: WebSocket):
     try:
-        logger.debug("WebSocket route invoked")
         await websocket_endpoint(websocket)
     except Exception as e:
         logger.exception(f"WebSocket error during handshake: {e}")
@@ -156,13 +153,11 @@ async def logs_stream(request: Request):
                             
                     await asyncio.sleep(0.5)  # Verifica a cada 500ms
                 except (asyncio.CancelledError, GeneratorExit):
-                    logger.debug("SSE client disconnected")
                     return
                 except Exception as e:
                     yield f"data: [ERROR] {e}\n\n"
                     await asyncio.sleep(1)
         except (asyncio.CancelledError, GeneratorExit):
-            logger.debug("SSE stream ended")
             return
     
     return StreamingResponse(

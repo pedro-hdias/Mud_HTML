@@ -14,11 +14,11 @@ def log_state_change(previous_state: ConnectionState, new_state: ConnectionState
     message = f"State change {previous_state.value} -> {new_state.value}"
     if context:
         message = f"{message} ({context})"
-    logger.debug(message)
+    logger.info(message)
 
 
 def log_state_read(state: ConnectionState, context: str = "") -> None:
     message = f"State read: {state.value}"
     if context:
         message = f"{message} ({context})"
-    logger.debug(message)
+    logger.info(message)
