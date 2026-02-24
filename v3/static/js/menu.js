@@ -19,6 +19,15 @@ const MenuManager = {
     // Tamanho máximo da chave para ser considerado menu (evita [info], [chat], etc.)
     maxKeyLength: 3,
 
+    // Buffer de entrada para capturar múltiplos dígitos
+    inputBuffer: {
+        value: "",
+        timeout: null,
+        element: null,
+        maxDigits: CONFIG.MENU_MAX_OPTION_DIGITS || 3,
+        bufferTimeoutMs: CONFIG.MENU_BUFFER_TIMEOUT_MS || 800
+    },
+
     // Padrões para detectar opções de menu: [1] Texto, 1. Texto, 1) Texto
     menuPatterns: [
         /^\[([a-zA-Z0-9]+)\]\s*-?\s*(.+)$/,  // [n] - Opção ou [n] Opção
@@ -328,27 +337,177 @@ const MenuManager = {
         }
 
         this.keyboardHandler = (e) => {
-            if (!this.currentMenu || !/^[a-zA-Z0-9]$/.test(e.key)) return;
+            if (!this.currentMenu) return;
 
-            // Ignora se modal está aberto
-            const loginModal = getElement(CONFIG.SELECTORS.loginModal);
-            const confirmModal = getElement(CONFIG.SELECTORS.confirmModal);
-            if (loginModal?.classList.contains(CONFIG.CLASSES.show) ||
-                confirmModal?.classList.contains(CONFIG.CLASSES.show)) {
+            // Verifica se é um dígito ou letra (a-z, A-Z, 0-9)
+            if (/^[a-zA-Z0-9]$/.test(e.key)) {
+                // Ignora se modal está aberto
+                const loginModal = getElement(CONFIG.SELECTORS.loginModal);
+                const confirmModal = getElement(CONFIG.SELECTORS.confirmModal);
+                if (loginModal?.classList.contains(CONFIG.CLASSES.show) ||
+                    confirmModal?.classList.contains(CONFIG.CLASSES.show)) {
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Adiciona dígito ao buffer
+                this.addToInputBuffer(e.key);
                 return;
             }
 
-            const validOption = this.currentMenu.options.find(opt =>
-                opt.key.toLowerCase() === e.key.toLowerCase()
-            );
-
-            if (validOption) {
+            // Backspace para remover dígito
+            if (e.key === "Backspace") {
                 e.preventDefault();
-                this.selectOption(e.key);
+                e.stopPropagation();
+                this.removeFromInputBuffer();
+                return;
+            }
+
+            // Enter para enviar o buffer atual
+            if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+                this.submitInputBuffer();
+                return;
             }
         };
 
         document.addEventListener("keydown", this.keyboardHandler);
+    },
+
+    /** Adiciona um dígito ao buffer */
+    addToInputBuffer(digit) {
+        // Limita o tamanho do buffer
+        if (this.inputBuffer.value.length >= this.inputBuffer.maxDigits) {
+            menuLogger.warn("Input buffer full, max digits reached");
+            return;
+        }
+
+        this.inputBuffer.value += digit.toLowerCase();
+        menuLogger.log(`Buffer updated: [${this.inputBuffer.value}]`);
+
+        // Reseta o timer
+        this.resetInputBufferTimeout();
+
+        // Atualiza UI
+        this.updateBufferDisplay();
+
+        // Valida se a opção existe
+        const validOption = this.currentMenu.options.find(opt =>
+            opt.key.toLowerCase() === this.inputBuffer.value
+        );
+
+        if (validOption) {
+            // Opção encontrada - marca como ready
+            this.inputBuffer.element?.classList.remove("invalid");
+            this.inputBuffer.element?.classList.add("ready");
+            menuLogger.log(`Option found: [${this.inputBuffer.value}] -> "${validOption.text}"`);
+        } else {
+            // Verifica se há opções que começam com o buffer
+            const hasPrefix = this.currentMenu.options.some(opt =>
+                opt.key.toLowerCase().startsWith(this.inputBuffer.value)
+            );
+
+            if (hasPrefix) {
+                this.inputBuffer.element?.classList.remove("invalid");
+                this.inputBuffer.element?.classList.remove("ready");
+                menuLogger.log(`Prefix match for buffer: [${this.inputBuffer.value}]`);
+            } else {
+                // Nenhuma opção válida
+                this.inputBuffer.element?.classList.add("invalid");
+                menuLogger.warn(`No valid option for buffer: [${this.inputBuffer.value}]`);
+            }
+        }
+    },
+
+    /** Remove o último dígito do buffer */
+    removeFromInputBuffer() {
+        if (this.inputBuffer.value.length === 0) return;
+
+        this.inputBuffer.value = this.inputBuffer.value.slice(0, -1);
+        menuLogger.log(`Buffer updated: [${this.inputBuffer.value}]`);
+
+        // Reseta o timer
+        this.resetInputBufferTimeout();
+
+        // Atualiza UI
+        this.updateBufferDisplay();
+
+        // Remove classes de validação
+        if (this.inputBuffer.value.length === 0) {
+            this.clearInputBuffer();
+            return;
+        }
+
+        this.inputBuffer.element?.classList.remove("invalid", "ready");
+    },
+
+    /** Envia o buffer atual como seleção de menu */
+    submitInputBuffer() {
+        if (this.inputBuffer.value.length === 0) return;
+
+        const validOption = this.currentMenu.options.find(opt =>
+            opt.key.toLowerCase() === this.inputBuffer.value
+        );
+
+        if (validOption) {
+            menuLogger.log(`Submitting from buffer: [${this.inputBuffer.value}]`);
+            this.clearInputBuffer();
+            this.selectOption(validOption.key);
+        } else {
+            menuLogger.warn(`Cannot submit invalid option: [${this.inputBuffer.value}]`);
+            this.inputBuffer.element?.classList.add("invalid");
+        }
+    },
+
+    /** Reseta o timer de timeout do buffer */
+    resetInputBufferTimeout() {
+        if (this.inputBuffer.timeout) {
+            clearTimeout(this.inputBuffer.timeout);
+        }
+
+        this.inputBuffer.timeout = setTimeout(() => {
+            menuLogger.log(`Buffer timeout, auto-submitting: [${this.inputBuffer.value}]`);
+            this.submitInputBuffer();
+        }, this.inputBuffer.bufferTimeoutMs);
+    },
+
+    /** Atualiza o display visual do buffer */
+    updateBufferDisplay() {
+        if (this.inputBuffer.value.length === 0) {
+            if (this.inputBuffer.element) {
+                this.inputBuffer.element.remove();
+                this.inputBuffer.element = null;
+            }
+            return;
+        }
+
+        if (!this.inputBuffer.element) {
+            this.inputBuffer.element = document.createElement("div");
+            this.inputBuffer.element.className = "menu-input-buffer";
+            document.body.appendChild(this.inputBuffer.element);
+        }
+
+        this.inputBuffer.element.textContent = `[${this.inputBuffer.value}]`;
+    },
+
+    /** Limpa o buffer de entrada */
+    clearInputBuffer() {
+        if (this.inputBuffer.timeout) {
+            clearTimeout(this.inputBuffer.timeout);
+            this.inputBuffer.timeout = null;
+        }
+
+        this.inputBuffer.value = "";
+
+        if (this.inputBuffer.element) {
+            this.inputBuffer.element.remove();
+            this.inputBuffer.element = null;
+        }
+
+        menuLogger.log("Input buffer cleared");
     },
 
     /** Desativa o menu atual */
@@ -357,6 +516,9 @@ const MenuManager = {
             document.removeEventListener("keydown", this.keyboardHandler);
             this.keyboardHandler = null;
         }
+
+        // Limpa o buffer de entrada
+        this.clearInputBuffer();
 
         if (this.currentMenu) {
             this.currentMenu.container.classList.add("menu-inactive");
@@ -380,6 +542,7 @@ const MenuManager = {
             this.menuTimer = null;
         }
         this.lineBuffer = [];
+        this.clearInputBuffer();
         this.deactivateMenu();
     }
 };
