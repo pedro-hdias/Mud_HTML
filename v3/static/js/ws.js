@@ -27,6 +27,14 @@ const COMMAND_SEND_MAX_MS = 200;
 // Idempotency guard for disconnect cleanup
 let _disconnectGuard = false;
 
+// Padrões para detectar quando o jogador está em-jogo
+const IN_GAME_PATTERNS = [
+    /^obvious exits?:/i,
+    /^exits?:\s/i,
+    /you (?:are in|go |enter |leave |arrive)/i,
+    /^\[hp:/i,
+];
+
 // Flags de reconexão e sessão ficam no StateStore
 
 function buildMessage(type, payload = {}, meta = {}) {
@@ -492,13 +500,6 @@ function detectSessionPhaseFromLine(line) {
     const phase = StateStore.getSessionPhase();
     if (phase === "IN_GAME") return; // already in-game, no need to check
 
-    const IN_GAME_PATTERNS = [
-        /^obvious exits?:/i,
-        /^exits?:\s/i,
-        /you (?:are in|go |enter |leave |arrive)/i,
-        /^\[hp:/i,    // common MUD health prompt pattern
-    ];
-
     if (IN_GAME_PATTERNS.some(p => p.test(line.trim()))) {
         transitionToPhase("IN_GAME", "in_game_signal");
     }
@@ -541,16 +542,19 @@ function sendCommand(commandText) {
     const commands = splitCommands(commandText);
     if (commands.length === 0) return;
 
-    if (commands.length === 1) {
-        // Single command: send directly (low latency)
+    if (commands.length === 1 && _outgoingQueue.length === 0) {
+        // Single command with no pending queue: send directly (low latency)
         lastCommandSent = commands[0];
         wsLogger.log("Sending command", commands[0]);
         sendMessage("command", { value: commands[0] });
         return;
     }
 
-    // Multiple commands (macro): enqueue with rate limiting
-    wsLogger.log(`Enqueued macro: count=${commands.length}`);
+    // Multiple commands (macro), or single command appended to in-flight queue:
+    // enqueue with rate limiting to preserve ordering
+    if (commands.length > 1) {
+        wsLogger.log(`Enqueued macro: count=${commands.length}`);
+    }
     commands.forEach(cmd => _outgoingQueue.push(cmd));
     _startOutgoingQueue();
 }
