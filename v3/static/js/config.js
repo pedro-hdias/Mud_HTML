@@ -108,6 +108,8 @@ const CONFIG = {
 
     // Menu interativo
     MENU_TIMEOUT_MS: 2500,
+    MENU_BUFFER_TIMEOUT_MS: 800,  // Timeout entre dígitos do buffer (ms)
+    MENU_MAX_OPTION_DIGITS: 3,   // Máximo de dígitos para opção (ex: 999)
 
     // Cookie config
     COOKIE_EXPIRY_DAYS: 30
