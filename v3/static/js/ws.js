@@ -21,7 +21,8 @@ let pendingCommandQueue = [];
 // Fila de saída com rate limiting (evita burst de macros)
 let _outgoingQueue = [];
 let _outgoingTimer = null;
-const COMMAND_SEND_INTERVAL_MS = 80;
+const COMMAND_SEND_MIN_MS = 20;
+const COMMAND_SEND_MAX_MS = 200;
 
 // Idempotency guard for disconnect cleanup
 let _disconnectGuard = false;
@@ -80,32 +81,38 @@ let _lastSendTimestamp = 0;
 
 // ===== Outgoing command queue (rate-limited to avoid burst sends) =====
 
-function _processOutgoingQueue() {
-    if (_outgoingQueue.length === 0) {
-        clearInterval(_outgoingTimer);
+function _randomSendDelay() {
+    return Math.floor(Math.random() * (COMMAND_SEND_MAX_MS - COMMAND_SEND_MIN_MS + 1)) + COMMAND_SEND_MIN_MS;
+}
+
+function _scheduleNextQueuedCommand() {
+    if (_outgoingQueue.length === 0 || !ws || ws.readyState !== WebSocket.OPEN) {
         _outgoingTimer = null;
         return;
     }
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-        clearInterval(_outgoingTimer);
-        _outgoingTimer = null;
-        return;
-    }
-    const cmd = _outgoingQueue.shift();
-    lastCommandSent = cmd;
-    sendMessage("command", { value: cmd });
-    wsLogger.debug("Sent queued command", cmd, `(${_outgoingQueue.length} remaining)`);
+    const delay = _randomSendDelay();
+    _outgoingTimer = setTimeout(() => {
+        if (_outgoingQueue.length === 0 || !ws || ws.readyState !== WebSocket.OPEN) {
+            _outgoingTimer = null;
+            return;
+        }
+        const cmd = _outgoingQueue.shift();
+        lastCommandSent = cmd;
+        sendMessage("command", { value: cmd });
+        wsLogger.debug("Sent queued command", cmd, `(${_outgoingQueue.length} remaining, delay=${delay}ms)`);
+        _scheduleNextQueuedCommand();
+    }, delay);
 }
 
 function _startOutgoingQueue() {
     if (!_outgoingTimer) {
-        _outgoingTimer = setInterval(_processOutgoingQueue, COMMAND_SEND_INTERVAL_MS);
+        _scheduleNextQueuedCommand();
     }
 }
 
 function _stopOutgoingQueue() {
     if (_outgoingTimer) {
-        clearInterval(_outgoingTimer);
+        clearTimeout(_outgoingTimer);
         _outgoingTimer = null;
     }
     _outgoingQueue = [];
