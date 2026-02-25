@@ -359,6 +359,17 @@ const MenuManager = {
                 e.preventDefault();
                 e.stopPropagation();
 
+                // For single-letter keys, select immediately without buffering
+                if (/^[a-zA-Z]$/.test(e.key)) {
+                    const exactMatch = this.currentMenu.options.find(opt =>
+                        opt.key.toLowerCase() === newBuffer
+                    );
+                    if (exactMatch) {
+                        this.selectOption(exactMatch.key);
+                        return;
+                    }
+                }
+
                 // Adiciona dígito ao buffer
                 this.addToInputBuffer(e.key);
                 return;
