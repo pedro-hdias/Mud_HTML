@@ -1,3 +1,14 @@
+/**
+ * @deprecated audio.js foi modularizado no pacote `audio/`.
+ *
+ * Este arquivo é mantido apenas para compatibilidade com carregamentos diretos
+ * externos. Para uso normal, carregue os módulos do pacote `audio/` na ordem:
+ *
+ *   audio/context.js  → audio/buffer.js → audio/registry.js →
+ *   audio/playback.js → audio/controls.js → audio/state.js → audio/index.js
+ *
+ * O arquivo index.html já foi atualizado para usar o pacote modular.
+ */
 const MudAudio = (() => {
     let ctx = null;
     let masterGain = null;
