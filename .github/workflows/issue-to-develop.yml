@@ -1,0 +1,107 @@
+name: Create PR from Issue to Develop
+
+on:
+  push:
+    branches:
+      - "**/issue**"
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract branch name
+        shell: bash
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+          echo "Branch: $BRANCH_NAME"
+
+      - name: Extract issue number
+        shell: bash
+        run: |
+          ISSUE_NUM=$(echo "${{ env.BRANCH_NAME }}" | grep -oP 'issue\K\d+' || echo "")
+          echo "ISSUE_NUM=$ISSUE_NUM" >> $GITHUB_ENV
+          if [ -n "$ISSUE_NUM" ]; then
+            echo "Issue number: #$ISSUE_NUM"
+          else
+            echo "No issue number found in branch name"
+          fi
+
+      - name: Validate develop branch
+        run: |
+          if ! git ls-remote --heads origin develop | grep -q develop; then
+            echo "❌ Branch develop does not exist in remote"
+            exit 1
+          fi
+          echo "✅ Branch develop exists"
+          git fetch origin develop:develop
+
+      - name: Check for existing PR
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Check if PR already exists
+          EXISTING_PR=$(gh pr list --head "${{ env.BRANCH_NAME }}" --base develop --json number --jq '.[0].number' || echo "")
+          if [ -n "$EXISTING_PR" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
+            echo "PR already exists: #$EXISTING_PR"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "No existing PR found"
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_pr.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Build PR body with optional issue link
+          PR_BODY="## 🚀 Automated PR from Feature Branch
+
+          This PR was automatically created from branch \`${{ env.BRANCH_NAME }}\`."
+
+          if [ -n "${{ env.ISSUE_NUM }}" ]; then
+            PR_BODY="$PR_BODY
+
+          ### 🔗 Related Issue
+          Closes #${{ env.ISSUE_NUM }}"
+          fi
+
+          PR_BODY="$PR_BODY
+
+          ### 📋 Changes
+          - Please review the changes in this feature branch
+
+          ### ✅ Checklist
+          - [ ] Code reviewed
+          - [ ] Tests passing
+          - [ ] Documentation updated
+
+          ---
+          *This PR was automatically created by GitHub Actions*"
+
+          gh pr create \
+            --title "Merge ${{ env.BRANCH_NAME }} into develop" \
+            --body "$PR_BODY" \
+            --base develop \
+            --head "${{ env.BRANCH_NAME }}"
+
+      - name: PR Summary
+        run: |
+          if [ "${{ steps.check_pr.outputs.exists }}" == "true" ]; then
+            echo "## ℹ️ PR Already Exists" >> $GITHUB_STEP_SUMMARY
+            echo "PR #${{ steps.check_pr.outputs.pr_number }} already exists for this branch." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ PR Created Successfully" >> $GITHUB_STEP_SUMMARY
+            echo "Pull request created from \`${{ env.BRANCH_NAME }}\` to \`develop\`" >> $GITHUB_STEP_SUMMARY
+          fi
