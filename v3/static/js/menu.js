@@ -339,16 +339,16 @@ const MenuManager = {
         this.keyboardHandler = (e) => {
             if (!this.currentMenu) return;
 
+            // Ignora se modal está aberto
+            const loginModal = getElement(CONFIG.SELECTORS.loginModal);
+            const confirmModal = getElement(CONFIG.SELECTORS.confirmModal);
+            if (loginModal?.classList.contains(CONFIG.CLASSES.show) ||
+                confirmModal?.classList.contains(CONFIG.CLASSES.show)) {
+                return;
+            }
+
             // Verifica se é um dígito ou letra (a-z, A-Z, 0-9)
             if (/^[a-zA-Z0-9]$/.test(e.key)) {
-                // Ignora se modal está aberto
-                const loginModal = getElement(CONFIG.SELECTORS.loginModal);
-                const confirmModal = getElement(CONFIG.SELECTORS.confirmModal);
-                if (loginModal?.classList.contains(CONFIG.CLASSES.show) ||
-                    confirmModal?.classList.contains(CONFIG.CLASSES.show)) {
-                    return;
-                }
-
                 // Only intercept if the key contributes to a valid option or prefix
                 const newBuffer = this.inputBuffer.value + e.key.toLowerCase();
                 const hasMatch = this.currentMenu.options.some(opt =>
