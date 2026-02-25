@@ -18,6 +18,14 @@ const RECONNECT_MAX_DELAY_MS = CONFIG.WS.reconnectMaxDelayMs;
 // Fila de comandos pendentes (enviados durante reconexão)
 let pendingCommandQueue = [];
 
+// Fila de saída com rate limiting (evita burst de macros)
+let _outgoingQueue = [];
+let _outgoingTimer = null;
+const COMMAND_SEND_INTERVAL_MS = 80;
+
+// Idempotency guard for disconnect cleanup
+let _disconnectGuard = false;
+
 // Flags de reconexão e sessão ficam no StateStore
 
 function buildMessage(type, payload = {}, meta = {}) {
@@ -69,6 +77,60 @@ function sendMessage(type, payload = {}, meta = {}) {
 
 // UX: Latência — timestamp do último envio para medir round-trip
 let _lastSendTimestamp = 0;
+
+// ===== Outgoing command queue (rate-limited to avoid burst sends) =====
+
+function _processOutgoingQueue() {
+    if (_outgoingQueue.length === 0) {
+        clearInterval(_outgoingTimer);
+        _outgoingTimer = null;
+        return;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        clearInterval(_outgoingTimer);
+        _outgoingTimer = null;
+        return;
+    }
+    const cmd = _outgoingQueue.shift();
+    lastCommandSent = cmd;
+    sendMessage("command", { value: cmd });
+    wsLogger.debug("Sent queued command", cmd, `(${_outgoingQueue.length} remaining)`);
+}
+
+function _startOutgoingQueue() {
+    if (!_outgoingTimer) {
+        _outgoingTimer = setInterval(_processOutgoingQueue, COMMAND_SEND_INTERVAL_MS);
+    }
+}
+
+function _stopOutgoingQueue() {
+    if (_outgoingTimer) {
+        clearInterval(_outgoingTimer);
+        _outgoingTimer = null;
+    }
+    _outgoingQueue = [];
+}
+
+// ===== Single authoritative disconnect handler =====
+
+/**
+ * Handles disconnect cleanup exactly once (idempotent).
+ * @param {string} reason - Reason for disconnection
+ */
+function handleDisconnect(reason) {
+    if (_disconnectGuard) {
+        wsLogger.debug("Disconnect already handled, skipping:", reason);
+        return;
+    }
+    _disconnectGuard = true;
+    wsLogger.log("Handling disconnect:", reason);
+
+    // Stop outgoing queue
+    _stopOutgoingQueue();
+
+    // Reset menu state
+    if (typeof MenuManager !== "undefined") MenuManager.reset();
+}
 
 
 /**
@@ -142,6 +204,9 @@ function scheduleReconnect() {
 function handleWebSocketOpen() {
     wsLogger.log("WebSocket opened");
 
+    // Reset disconnect guard so cleanup can run on next disconnect
+    _disconnectGuard = false;
+
     if (window.SoundInterceptor && typeof window.SoundInterceptor.init === "function") {
         window.SoundInterceptor.init();
     }
@@ -174,7 +239,7 @@ function handleWebSocketOpen() {
  */
 function handleWebSocketMessage(event) {
     try {
-        wsLogger.log("WebSocket message received", event.data);
+        wsLogger.debug("WebSocket message received", event.data);
         const msg = parseMessage(event.data);
         if (!msg) return;
 
@@ -233,12 +298,14 @@ function handleWebSocketClose(event) {
         sysMessage = "[SISTEMA] Sessão inválida. Clique em 'Login' para conectar novamente.";
         sysColor = "orange";
 
+        handleDisconnect("session_invalidated_4003");
         // Limpa publicId e token para forçar geração de novos
         StorageManager.clearSession();
         StateStore.setAllowReconnect(false);
         updateConnectionState("DISCONNECTED");
     } else if (StateStore.isManualDisconnect()) {
         sysMessage = "[SISTEMA] Desconectado";
+        handleDisconnect("manual_disconnect");
         // Limpa sessão em desconexão manual
         StorageManager.clearSession();
         StateStore.setAllowReconnect(false);
@@ -247,10 +314,12 @@ function handleWebSocketClose(event) {
     } else {
         // Conexão perdida involuntariamente
         if (!StateStore.isReconnectAllowed()) {
+            handleDisconnect("connection_lost_no_reconnect");
             updateConnectionState("DISCONNECTED");
             return;
         }
 
+        handleDisconnect("connection_lost_reconnecting");
         if (reconnectAttempts === 0) {
             sysMessage = "[SISTEMA] Conexão perdida - tentando reconectar...";
         }
@@ -345,6 +414,9 @@ function handleSoundMessage(payload) {
 }
 
 function handleStateMessage(payload) {
+    if (payload.value === "DISCONNECTED") {
+        handleDisconnect("state_message_disconnected");
+    }
     updateConnectionState(payload.value);
 }
 
@@ -394,10 +466,34 @@ function handleLineMessage(payload) {
         checkAndShowLogin();
     }
 
+    // Detect in-game signals to transition session phase
+    detectSessionPhaseFromLine(payload.content);
+
     // Verifica se é um prompt de confirmação (apenas se não for menu)
     if (!isMenuLine && PromptDetector.shouldShowConfirmPrompt(payload.content)) {
         const promptMessage = PromptDetector.buildConfirmMessage(payload.content);
         showConfirmModal(promptMessage);
+    }
+}
+
+/**
+ * Detects session phase transitions from incoming MUD text lines.
+ * Transitions to IN_GAME when room/movement signals are detected.
+ * @param {string} line - Incoming line from MUD server
+ */
+function detectSessionPhaseFromLine(line) {
+    const phase = StateStore.getSessionPhase();
+    if (phase === "IN_GAME") return; // already in-game, no need to check
+
+    const IN_GAME_PATTERNS = [
+        /^obvious exits?:/i,
+        /^exits?:\s/i,
+        /you (?:are in|go |enter |leave |arrive)/i,
+        /^\[hp:/i,    // common MUD health prompt pattern
+    ];
+
+    if (IN_GAME_PATTERNS.some(p => p.test(line.trim()))) {
+        transitionToPhase("IN_GAME", "in_game_signal");
     }
 }
 
@@ -418,7 +514,8 @@ function splitCommands(commandText) {
 }
 
 /**
- * Envia comando para o servidor
+ * Envia comando para o servidor.
+ * Single commands are sent directly; multiple commands (macro) are rate-queued.
  */
 function sendCommand(commandText) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -435,11 +532,20 @@ function sendCommand(commandText) {
     }
 
     const commands = splitCommands(commandText);
-    for (const command of commands) {
-        lastCommandSent = command;
-        wsLogger.log("Sending command", command);
-        sendMessage("command", { value: command });
+    if (commands.length === 0) return;
+
+    if (commands.length === 1) {
+        // Single command: send directly (low latency)
+        lastCommandSent = commands[0];
+        wsLogger.log("Sending command", commands[0]);
+        sendMessage("command", { value: commands[0] });
+        return;
     }
+
+    // Multiple commands (macro): enqueue with rate limiting
+    wsLogger.log(`Enqueued macro: count=${commands.length}`);
+    commands.forEach(cmd => _outgoingQueue.push(cmd));
+    _startOutgoingQueue();
 }
 
 /**
@@ -479,6 +585,8 @@ function sendLogin(username, password) {
     }
 
     wsLogger.log("Sending login");
+    // Transition to AUTH_IN_PROGRESS immediately - deactivates any stale menu
+    transitionToPhase("AUTH_IN_PROGRESS", "login_sent");
     sendMessage("login", {
         username: username,
         password: password

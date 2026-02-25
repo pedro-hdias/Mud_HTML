@@ -18,6 +18,8 @@ const MenuManager = {
     minMenuOptions: 2,
     // Tamanho máximo da chave para ser considerado menu (evita [info], [chat], etc.)
     maxKeyLength: 3,
+    // Flag: non-menu line logged for current candidate (to avoid spam)
+    _nonMenuLineLogged: false,
 
     // Padrões para detectar opções de menu: [1] Texto, 1. Texto, 1) Texto
     menuPatterns: [
@@ -76,12 +78,45 @@ const MenuManager = {
     },
 
     /**
+     * Verifica se a linha é um terminador de menu (ex: [Input])
+     * @param {string} line
+     * @returns {boolean}
+     */
+    isMenuTerminator(line) {
+        const trimmed = line.trim();
+        return /^\[input\]/i.test(trimmed);
+    },
+
+    /**
      * Processa uma nova linha recebida
      * @param {string} line - Linha de texto
      * @param {HTMLElement} output - Elemento de output
      * @returns {boolean} - true se a linha faz parte de um menu
      */
     processLine(line, output) {
+        // "Valid commands are:" resets any in-progress buffer and signals menu start
+        if (/valid commands are:/i.test(line.trim())) {
+            menuLogger.log("Valid commands are: detected - resetting menu buffer");
+            this.lineBuffer = [];
+            this._nonMenuLineLogged = false;
+            if (this.menuTimer) { clearTimeout(this.menuTimer); this.menuTimer = null; }
+            return false;
+        }
+
+        // [Input] or similar terminators finalize the menu immediately
+        if (this.isMenuTerminator(line)) {
+            if (this.lineBuffer.length >= this.minMenuOptions && this.isValidMenuSequence()) {
+                menuLogger.log("Menu terminator detected - finalizing menu immediately");
+                this.finalizeMenu(output);
+            } else if (this.lineBuffer.length > 0) {
+                menuLogger.debug("Menu terminator with insufficient options - clearing buffer");
+                this.lineBuffer = [];
+                this._nonMenuLineLogged = false;
+                if (this.menuTimer) { clearTimeout(this.menuTimer); this.menuTimer = null; }
+            }
+            return false;
+        }
+
         const option = this.detectMenuOption(line);
         const isPrompt = this.isSelectionPrompt(line);
 
@@ -89,6 +124,7 @@ const MenuManager = {
         if (option) {
             menuLogger.log(`Menu option added to buffer. Total: ${this.lineBuffer.length + 1}`);
             this.lineBuffer.push({ line, option, element: null });
+            this._nonMenuLineLogged = false;
             this.resetMenuTimer(output);
             return true;
         }
@@ -112,8 +148,11 @@ const MenuManager = {
                 }
                 return false;
             }
-            // Linha não vazia e não é opção - pode ser o fim do menu
-            menuLogger.log(`Non-menu line detected, will finalize if timeout expires`);
+            // Linha não vazia e não é opção - log only once per menu candidate
+            if (!this._nonMenuLineLogged) {
+                menuLogger.log("Non-menu line detected, will finalize if timeout expires");
+                this._nonMenuLineLogged = true;
+            }
             this.resetMenuTimer(output);
         }
 
@@ -297,6 +336,13 @@ const MenuManager = {
     selectOption(optionKey) {
         if (!this.currentMenu) return;
 
+        // Gate: ignore menu clicks when not in UNAUTHENTICATED phase
+        const phase = typeof StateStore !== "undefined" ? StateStore.getSessionPhase() : "UNAUTHENTICATED";
+        if (phase !== "UNAUTHENTICATED") {
+            menuLogger.debug(`Menu click ignored: phase=${phase}`);
+            return;
+        }
+
         const keyStr = optionKey.toString().toLowerCase();
         const validOption = this.currentMenu.options.find(opt => opt.key.toLowerCase() === keyStr);
 
@@ -380,6 +426,7 @@ const MenuManager = {
             this.menuTimer = null;
         }
         this.lineBuffer = [];
+        this._nonMenuLineLogged = false;
         this.deactivateMenu();
     }
 };
