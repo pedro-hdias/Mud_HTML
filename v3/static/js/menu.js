@@ -349,6 +349,13 @@ const MenuManager = {
                     return;
                 }
 
+                // Only intercept if the key contributes to a valid option or prefix
+                const newBuffer = this.inputBuffer.value + e.key.toLowerCase();
+                const hasMatch = this.currentMenu.options.some(opt =>
+                    opt.key.toLowerCase().startsWith(newBuffer)
+                );
+                if (!hasMatch) return;
+
                 e.preventDefault();
                 e.stopPropagation();
 
