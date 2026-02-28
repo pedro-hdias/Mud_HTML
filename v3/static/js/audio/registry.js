@@ -36,13 +36,25 @@
     /**
      * resolve(name) — converte nome semântico em URL.
      * Se name já é URL (começa com / ou http), retorna direto.
+     * Busca case-insensitive: 'Flight Control' e 'flight control' são tratados igualmente.
      */
     async function resolve(name) {
         if (name.startsWith("/") || name.startsWith("http")) return name;
         await _ensureRegistry();
-        const file = _MudAudio._registry[name];
-        if (!file) throw new Error(`Som não encontrado no registry: "${name}"`);
-        return SOUNDS_BASE + file;
+
+        // Primeiro tenta encontrar exatamente (mais rápido)
+        let file = _MudAudio._registry[name];
+        if (file) return SOUNDS_BASE + file;
+
+        // Se não encontrou, busca case-insensitive
+        const nameLower = name.toLowerCase();
+        for (const [key, value] of Object.entries(_MudAudio._registry)) {
+            if (key.toLowerCase() === nameLower) {
+                return SOUNDS_BASE + value;
+            }
+        }
+
+        throw new Error(`Som não encontrado no registry: "${name}"`);
     }
 
     /**

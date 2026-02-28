@@ -212,20 +212,21 @@ class SendInterpreter:
             channel = "global" if func == "PlayGlobalSound" else "combat"
             path = self._eval_value(args[0]) if args else None
             
-            # Valida se o arquivo de som existe
-            if not self._sound_file_exists(path):
+            # Normaliza o caminho do arquivo (retorna a capitalização correta se encontrado)
+            normalized_path = self._get_normalized_sound_path(path)
+            if normalized_path is None:
                 logger.warning(f"Arquivo de som não encontrado: {path}")
                 return
             
             pan = int(self._eval_value(args[1])) if len(args) > 1 else None
             sound_id = self._next_sound_id()
             
-            logger.info(f"Som criado: channel={channel}, path='{path}', pan={pan}, sound_id={sound_id}, delay_ms={delay_ms}")
+            logger.info(f"Som criado: channel={channel}, path='{normalized_path}', pan={pan}, sound_id={sound_id}, delay_ms={delay_ms}")
             
             event = {
                 "action": "play",
                 "channel": channel,
-                "path": path,
+                "path": normalized_path,
                 "delay_ms": delay_ms,
                 "pan": pan,
                 "volume": 100,
@@ -408,19 +409,64 @@ class SendInterpreter:
         return parts
 
     def _sound_file_exists(self, path: Optional[str]) -> bool:
-        """Valida se o arquivo de som existe no diretório de sons estáticos."""
+        """Valida se o arquivo de som existe no diretório de sons estáticos (case-insensitive).
+        Retorna True se encontra o arquivo independentemente da capitalização."""
         if not path:
             return False
         
-        # Constrói o caminho completo do arquivo de som
-        # __file__ está em v3/app/sounds/interpreter.py, então sobe 3 níveis para v3, depois acessa static/sounds
         sounds_dir = Path(__file__).resolve().parents[2] / "static" / "sounds"
-        sound_file = sounds_dir / path
         
-        exists = sound_file.exists()
-
-        return exists
-
+        # Busca case-insensitive
+        return self._find_file_case_insensitive(sounds_dir, path) is not None
+    
+    def _get_normalized_sound_path(self, path: Optional[str]) -> Optional[str]:
+        """Retorna o caminho normalizado (com capitalização correta) do arquivo, ou None se não encontrar.
+        Garante que 'Flight Control', 'flight control', 'FLIGHT CONTROL' etc. retornam o nome canônico."""
+        if not path:
+            return None
+        
+        sounds_dir = Path(__file__).resolve().parents[2] / "static" / "sounds"
+        
+        # Sempre busca case-insensitive para obter a capitalização correta
+        normalized = self._find_file_case_insensitive(sounds_dir, path)
+        if normalized:
+            # Converte Path para string relativo com forward slashes
+            return str(normalized.relative_to(sounds_dir)).replace("\\", "/")
+        
+        return None
+    
+    def _find_file_case_insensitive(self, base_dir: Path, relative_path: str) -> Optional[Path]:
+        """Busca arquivo de forma case-insensitive perguntando o caminho.
+        Retorna o Path absolutamente se encontrado, ou None se não encontrar."""
+        parts = Path(relative_path).parts
+        current_dir = base_dir
+        
+        for part in parts:
+            if not current_dir.is_dir():
+                return None
+            
+            # Busca a próxima parte ignorando maiúsculas/minúsculas
+            part_lower = part.lower()
+            found = False
+            
+            try:
+                for item in current_dir.iterdir():
+                    if item.name.lower() == part_lower:
+                        current_dir = item
+                        found = True
+                        break
+            except (OSError, PermissionError):
+                return None
+            
+            if not found:
+                return None
+        
+        # Verifica se o caminho final é um arquivo
+        if current_dir.is_file():
+            return current_dir
+        
+        return None
+    
     def _resolve_vars(self, text: str) -> str:
         """Substitui variáveis %0, %1, %2, ... por capturas de regex."""
         resolved = text
