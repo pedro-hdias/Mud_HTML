@@ -10,6 +10,13 @@
 - tratamento centralizado e idempotente de desconexão para limpeza de fila de saída e reset de menu
 - normalização case-insensitive de caminhos de áudio no interpretador de `send(...)`, retornando capitalização canônica do arquivo
 
+### Changed
+- carregamento de scripts de áudio em `v3/static/index.html` passou de arquivo único para pipeline modular com ordem explícita de dependências
+- resolução de nomes no registry de áudio (`resolve`) agora aceita busca case-insensitive para nomes semânticos
+- detecção de menu em `v3/static/js/menu.js` ganhou terminador por `[Input]`, reset por `Valid commands are:` e redução de logs repetitivos
+- cliques de menu passaram a respeitar fase da sessão (somente durante estado não autenticado)
+- processamento de mensagens WebSocket prioriza log `debug` para payload bruto e sincroniza fase de autenticação no envio de login
+
 ## v3 (2026-02-14)
 
 ### Added
