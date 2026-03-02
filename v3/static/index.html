@@ -19,9 +19,50 @@
     <div id="controls">
         <button id="btnLogin" aria-label="Connect to server">Login</button>
         <button id="btnDisconnect" aria-label="Disconnect from server" disabled>Disconnect</button>
+
+        <div class="controls-divider"></div>
+
         <button id="btnClear" aria-label="Clear screen" title="Clear all output history">Clear Screen</button>
-        <button id="btnSoundToggle" aria-label="Toggle automatic audio"
-            title="Enable/disable automatic sound playback">🔊 Audio: OFF</button>
+
+        <div id="audioControl" class="audio-control-group" title="Audio controls">
+            <button id="btnAudioMenu" aria-label="Audio menu" class="audio-menu-btn" aria-expanded="false"
+                aria-haspopup="true">
+                🔊
+            </button>
+
+            <div id="volumeControl" class="volume-control-inline">
+                <input type="range" id="volumeSlider" min="0" max="100" value="100" step="1"
+                    aria-label="Master volume" />
+                <span id="volumeValue">100%</span>
+            </div>
+
+            <div id="audioMenu" class="audio-menu-popup" hidden>
+                <div class="audio-menu-header">Audio Controls</div>
+
+                <label class="audio-menu-item" title="Auto-play sounds when triggered by server rules">
+                    <input type="checkbox" id="checkAutoPlay" disabled />
+                    <span>Auto-play sounds</span>
+                    <span class="audio-status">⚙</span>
+                </label>
+
+                <button id="btnQuickMute" class="audio-menu-item" aria-label="Quick mute">
+                    <span>🔊 Mute (Key: M)</span>
+                </button>
+
+                <div class="audio-menu-divider"></div>
+
+                <div class="audio-menu-info">
+                    <div class="info-row">
+                        <span>Volume:</span>
+                        <span id="infoVolume">100%</span>
+                    </div>
+                    <div class="info-row">
+                        <span>Active sounds:</span>
+                        <span id="infoActiveSounds">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div id="statusIndicator">
             <div id="statusDot"></div>
@@ -102,6 +143,8 @@
     <script src="/static/js/audio/state.js"></script>
     <script src="/static/js/audio/index.js"></script>
     <script src="/static/js/sound-handler.js"></script>
+    <script src="/static/js/volume-control.js"></script>
+    <script src="/static/js/audio-menu-control.js"></script>
     <script src="/static/js/ws.js"></script>
 
 </body>

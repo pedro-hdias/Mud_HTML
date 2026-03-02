@@ -51,7 +51,6 @@ const EventManager = {
         const btnLogin = getElement(CONFIG.SELECTORS.btnLogin);
         const btnDisconnect = getElement(CONFIG.SELECTORS.btnDisconnect);
         const btnClear = getElement(CONFIG.SELECTORS.btnClear);
-        const btnSoundToggle = getElement(CONFIG.SELECTORS.btnSoundToggle);
         const btnSend = getElement(CONFIG.SELECTORS.btnSend);
         const btnCancelReconnect = getElement(CONFIG.SELECTORS.btnCancelReconnect);
 
@@ -73,13 +72,6 @@ const EventManager = {
             btnClear.addEventListener("click", () => {
                 eventsLogger.log("Clear output clicked");
                 this.handleClearClick();
-            }, { signal: this._abortController.signal });
-        }
-
-        if (btnSoundToggle) {
-            btnSoundToggle.addEventListener("click", () => {
-                eventsLogger.log("Sound toggle clicked");
-                this.handleSoundToggleClick();
             }, { signal: this._abortController.signal });
         }
 
@@ -324,23 +316,6 @@ const EventManager = {
         const output = getElement(CONFIG.SELECTORS.output);
         if (output) output.innerHTML = "";
     },
-
-    handleSoundToggleClick() {
-        if (typeof SoundInterceptor === "undefined" || !SoundInterceptor.toggleAutoPlay) {
-            eventsLogger.warn("SoundInterceptor not available");
-            return;
-        }
-
-        const isNowEnabled = SoundInterceptor.toggleAutoPlay();
-        const btn = getElement(CONFIG.SELECTORS.btnSoundToggle);
-        if (btn) {
-            btn.textContent = isNowEnabled ? "🔊 Audio: ON" : "🔊 Audio: OFF";
-            btn.classList.toggle("active", isNowEnabled);
-        }
-
-        eventsLogger.log("Sound auto-play toggled:", isNowEnabled);
-    },
-
 
 
     handleSendClick() {
