@@ -17,6 +17,10 @@
 - cliques de menu passaram a respeitar fase da sessão (somente durante estado não autenticado)
 - processamento de mensagens WebSocket prioriza log `debug` para payload bruto e sincroniza fase de autenticação no envio de login
 
+### Removed
+- arquivo monolítico `v3/static/js/audio.js`, substituído pelo pacote modular em `v3/static/js/audio/`
+- artefatos binários versionados no repositório raiz: `mud_html_v1.26.02.06.1205.zip`, `mud_html_v1.26.02.07.2233.zip`, `mud_html_v2.26.02.10.2006.zip` e `mud_html_v3.26.02.14.1752.zip`
+
 ## v3 (2026-02-14)
 
 ### Added
