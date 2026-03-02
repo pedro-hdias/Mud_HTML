@@ -27,6 +27,7 @@ class TriggerRule:
     match: str
     regexp: bool
     ignore_case: bool
+    keep_evaluating: bool
     sequence: int
     send_text: str
     send_to: Optional[str]

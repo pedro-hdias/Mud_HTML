@@ -9,11 +9,22 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 from .models import SoundEvent
+from .registry import get_registry
 from .state import _Settings, _ConfigTable
 from .lua import to_number, lua_match
 from ..logger import get_logger
 
 logger = get_logger(__name__)
+
+# Pseudo-canais de sistema que não possuem arquivos de som de canal
+# Estes são usados pelo jogo para mensagens informativas, não comunicação real
+SYSTEM_PSEUDO_CHANNELS = {
+    "info",
+    "system",
+    "game",
+    "server",
+    "admin",
+}
 
 
 class SendInterpreter:
@@ -212,36 +223,52 @@ class SendInterpreter:
             channel = "global" if func == "PlayGlobalSound" else "combat"
             path = self._eval_value(args[0]) if args else None
             
-            # Normaliza o caminho do arquivo (retorna a capitalização correta se encontrado)
-            normalized_path = self._get_normalized_sound_path(path)
-            if normalized_path is None:
-                logger.warning(f"Arquivo de som não encontrado: {path}")
+            # ⚠️ VALIDAÇÃO MELHORADA: Descartar paths inválidos (single-letter, muito curtos, etc)
+            if not self._is_valid_sound_path(path):
+                logger.debug(f"[PlaySound] ✗ Path inválido descartado: '{path}' (muito curto ou padrão inválido)")
                 return
             
+            # ⚠️ VALIDAÇÃO DE PSEUDO-CANAIS: Descartar canais de sistema que não existem
+            if not self._is_valid_channel_sound(path):
+                logger.info(f"[PlaySound] Pseudo-canal de sistema ignorado: '{path}'")
+                return
+            
+            # Log: Tentativa de tocar som
+            logger.info(f"[PlaySound] Tentativa: func={func}, original_path='{path}', channel={channel}, delay_ms={delay_ms}")
+            
+            # Normaliza o caminho do arquivo (retorna a capitalização correta se encontrado)
+            normalized_path = self._get_normalized_sound_path(path)
+            
+            if normalized_path is None:
+                # Log detalhado de falha
+                logger.warning(f"[PlaySound] ✗ Arquivo não encontrado: '{path}'")
+                
+                # Sugerir arquivos similares
+                registry = get_registry()
+                similar = registry.find_similar(path, max_results=3)
+                if similar:
+                    logger.warning(f"[PlaySound] Arquivos similares disponíveis:")
+                    for sim in similar:
+                        logger.warning(f"[PlaySound]   - {sim}")
+                
+                # 🎵 FALLBACK: Tocar som padrão se disponível
+                fallback = self._get_fallback_sound(channel)
+                if fallback:
+                    logger.info(f"[PlaySound] 🔄 Usando fallback: {fallback}")
+                    self._emit_sound_event(fallback, channel, None, delay_ms, "fallback")
+                    return
+            
             pan = int(self._eval_value(args[1])) if len(args) > 1 else None
-            sound_id = self._next_sound_id()
             
-            logger.info(f"Som criado: channel={channel}, path='{normalized_path}', pan={pan}, sound_id={sound_id}, delay_ms={delay_ms}")
+            # Log: Sucesso
+            logger.info(f"[PlaySound] ✓ Som criado: path='{normalized_path}', pan={pan}, delay_ms={delay_ms}")
             
-            event = {
-                "action": "play",
-                "channel": channel,
-                "path": normalized_path,
-                "delay_ms": delay_ms,
-                "pan": pan,
-                "volume": 100,
-                "sound_id": sound_id,
-                "target": None,
-            }
-            
-            target_var = assign_to or ("CurrentGlobalSound" if channel == "global" else "CurrentCombatSound")
-            self._variables[target_var] = sound_id
-            self._events.append(event)
+            self._emit_sound_event(normalized_path, channel, pan, delay_ms, source="normal")
             return
 
         if func == "StopSound":
             target = self._eval_value(args[0]) if args else None
-            logger.info(f"Stop sound: target='{target}', delay_ms={delay_ms}")
+            logger.info(f"[StopSound] target='{target}', delay_ms={delay_ms}")
             
             event = {
                 "action": "stop",
@@ -413,26 +440,29 @@ class SendInterpreter:
         Retorna True se encontra o arquivo independentemente da capitalização."""
         if not path:
             return False
-        
-        sounds_dir = Path(__file__).resolve().parents[2] / "static" / "sounds"
-        
-        # Busca case-insensitive
-        return self._find_file_case_insensitive(sounds_dir, path) is not None
+
+        registry = get_registry()
+        return registry.exists(path)
     
     def _get_normalized_sound_path(self, path: Optional[str]) -> Optional[str]:
         """Retorna o caminho normalizado (com capitalização correta) do arquivo, ou None se não encontrar.
         Garante que 'Flight Control', 'flight control', 'FLIGHT CONTROL' etc. retornam o nome canônico."""
         if not path:
             return None
-        
-        sounds_dir = Path(__file__).resolve().parents[2] / "static" / "sounds"
-        
-        # Sempre busca case-insensitive para obter a capitalização correta
-        normalized = self._find_file_case_insensitive(sounds_dir, path)
+
+        registry = get_registry()
+
+        # Primeiro tenta match exato case-insensitive
+        normalized = registry.get(path)
         if normalized:
-            # Converte Path para string relativo com forward slashes
-            return str(normalized.relative_to(sounds_dir)).replace("\\", "/")
-        
+            return normalized
+
+        # Depois tenta uma resolução inteligente baseada no catálogo carregado no startup
+        best_match = registry.resolve_best(path)
+        if best_match:
+            logger.info(f"[PlaySound] ↪ Resolução inteligente: '{path}' -> '{best_match}'")
+            return best_match
+
         return None
     
     def _find_file_case_insensitive(self, base_dir: Path, relative_path: str) -> Optional[Path]:
@@ -471,8 +501,15 @@ class SendInterpreter:
         """Substitui variáveis %0, %1, %2, ... por capturas de regex."""
         resolved = text
         for idx, value in enumerate(self._captures):
-            # Escapa aspas duplas para evitar quebra de sintaxe Lua
-            escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+            # Usa repr() para escapar corretamente todos os caracteres especiais
+            # Isso previne SyntaxWarnings com sequências de escape inválidas
+            escaped_value = repr(value)
+            # Remove as aspas externas adicionadas por repr()
+            if escaped_value.startswith('"') and escaped_value.endswith('"'):
+                escaped_value = escaped_value[1:-1]
+            elif escaped_value.startswith("'") and escaped_value.endswith("'"):
+                escaped_value = escaped_value[1:-1]
+            
             resolved = resolved.replace(f"%{idx}", escaped_value)
         return resolved
 
@@ -481,3 +518,128 @@ class SendInterpreter:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
             return value[1:-1]
         return value
+    # ========== NOVOS MÉTODOS: VALIDAÇÃO E FALLBACK ==========
+
+    def _is_valid_sound_path(self, path: Optional[str]) -> bool:
+        """
+        Valida se o path segue padrão de arquivo de som válido.
+        
+        Descarta:
+        - Paths None ou vazios
+        - Single-letter paths (n.ogg, p.ogg, a.ogg, etc)
+        - Paths sem extensão .ogg
+        - Paths muito curtos (< 4 caracteres)
+        - Paths com caracteres perigosos
+        - Paths com traversal (.. ou ./)
+        """
+        if not path or not isinstance(path, str):
+            return False
+        
+        path = path.strip()
+        
+        # Muito curto (single-letter commands)
+        if len(path) < 4:
+            return False
+        
+        # Deve ter extensão .ogg
+        if not path.lower().endswith(".ogg"):
+            return False
+        
+        # Deve ter pelo menos uma barra (diretório/arquivo.ogg)
+        if "/" not in path and "\\" not in path:
+            return False
+
+        normalized_path = path.replace("\\", "/")
+
+        # Evitar falsos positivos comuns: basename de 1 caractere (ex: General/Channels/n.ogg)
+        # Isso acontece em linhas de menu [n]/[p]/[a]/... capturadas por regras de canal.
+        basename = normalized_path.rsplit("/", 1)[-1]
+        stem = basename[:-4] if basename.lower().endswith(".ogg") else basename
+        if len(stem) <= 1:
+            return False
+        
+        # Path traversal detection: .. ou ./
+        if ".." in path or normalized_path.startswith("./"):
+            return False
+        
+        # Caracteres seguros (incluir espaço e hífen)
+        safe_chars = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/_\\.- ")
+        if not all(c in safe_chars for c in path):
+            return False
+        
+        return True
+    
+    def _is_valid_channel_sound(self, path: Optional[str]) -> bool:
+        """
+        Verifica se um caminho de som de canal é válido.
+        Retorna False para pseudo-canais de sistema que não existem.
+        
+        Exemplo:
+            General/Channels/INFO.ogg -> False (INFO é pseudo-canal)
+            General/Channels/OOC.ogg -> True (OOC é canal real)
+        """
+        if not path:
+            return True
+        
+        # Detecta padrão General/Channels/*
+        normalized_path = path.replace("\\", "/")
+        if "General/Channels/" in normalized_path or "general/channels/" in normalized_path.lower():
+            # Extrai nome do canal do caminho
+            channel_name = Path(normalized_path).stem.lower()  # "INFO.ogg" -> "info"
+            
+            # Verifica se é pseudo-canal
+            if channel_name in SYSTEM_PSEUDO_CHANNELS:
+                logger.debug(f"[PlaySound] Pseudo-canal de sistema detectado: '{channel_name}' - som ignorado")
+                return False
+        
+        return True
+    
+    def _get_fallback_sound(self, channel: str) -> Optional[str]:
+        """
+        Retorna path de fallback sound baseado no canal.
+        
+        Returns:
+            Path normalizado do fallback ou None
+        """
+        fallback_map = {
+            "global": "General/Misc/Beep2.ogg",
+            "combat": "General/Devices/ButtonPush.ogg",
+        }
+        
+        fallback_path = fallback_map.get(channel)
+        if fallback_path:
+            return self._get_normalized_sound_path(fallback_path)
+        
+        return None
+    
+    def _emit_sound_event(self, path: str, channel: str, pan: Optional[int], 
+                         delay_ms: int, source: str = "normal") -> None:
+        """
+        Emite evento de som para a fila.
+        
+        Args:
+            path: Caminho normalizado do som
+            channel: Canal (global, combat, etc)
+            pan: Panning value
+            delay_ms: Delay em ms
+            source: Origem do evento (normal, fallback, etc)
+        """
+        sound_id = self._next_sound_id()
+        
+        event = {
+            "action": "play",
+            "channel": channel,
+            "path": path,
+            "delay_ms": delay_ms,
+            "pan": pan,
+            "volume": 100,
+            "sound_id": sound_id,
+            "target": None,
+            "source": source,  # DEBUG: Rastrear origem
+        }
+        
+        target_var = "CurrentGlobalSound" if channel == "global" else "CurrentCombatSound"
+        self._variables[target_var] = sound_id
+        self._events.append(event)
+        
+        logger.debug(f"[SoundEvent] Emitido: source={source}, path={path}, channel={channel}, sound_id={sound_id}")

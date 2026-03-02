@@ -219,7 +219,7 @@ const UIHelpers = {
         if (!statusText) return;
         // Só mostra se conectado
         if (StateStore.getConnectionState() === "CONNECTED") {
-            statusText.textContent = `Conectado (${ms}ms)`;
+            statusText.textContent = `Connected (${ms}ms)`;
         }
     },
 

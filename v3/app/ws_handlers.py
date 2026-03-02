@@ -15,7 +15,7 @@ logger = get_logger("ws_handlers")
 
 
 async def handle_connect(session: MudSession, ws: WebSocket, public_id: str, session_manager) -> None:
-    """Processa pedido de conexão ao MUD"""
+    """Handles request to connect to MUD"""
     log_state_read(session.state, f"connect_request_{public_id}")
     if session.state == ConnectionState.DISCONNECTED:
         await session.broadcast_state(ConnectionState.CONNECTING)
@@ -24,11 +24,11 @@ async def handle_connect(session: MudSession, ws: WebSocket, public_id: str, ses
             session.reader_task = asyncio.create_task(session.mud_reader())
         else:
             await session.broadcast_state(ConnectionState.DISCONNECTED)
-            await ws.send_json(make_message("system", {"message": "Falha ao conectar no servidor"}))
+            await ws.send_json(make_message("system", {"message": "Failed to connect to server"}))
 
 
 async def handle_disconnect(session: MudSession, ws: WebSocket, public_id: str, session_manager) -> None:
-    """Processa pedido de desconexão do MUD"""
+    """Handles request to disconnect from MUD"""
     log_state_read(session.state, f"disconnect_request_{public_id}")
     if session.state != ConnectionState.DISCONNECTED and session.writer:
         # Marca como desconexão manual (invalida sessão)
@@ -51,7 +51,7 @@ async def handle_disconnect(session: MudSession, ws: WebSocket, public_id: str, 
 
 
 async def handle_login(session: MudSession, ws: WebSocket, public_id: str, payload: dict) -> None:
-    """Processa credenciais de login"""
+    """Processes login credentials"""
     log_state_read(session.state, f"login_request_{public_id}")
     if session.writer and session.state in [ConnectionState.CONNECTED, ConnectionState.AWAITING_LOGIN]:
         username: str = payload.get("username", "")
@@ -69,7 +69,7 @@ async def handle_login(session: MudSession, ws: WebSocket, public_id: str, paylo
 
 
 async def handle_command(session: MudSession, ws: WebSocket, public_id: str, payload: dict) -> None:
-    """Processa comando normal do jogador"""
+    """Handles normal player command"""
     log_state_read(session.state, f"command_request_{public_id}")
     if session.writer and session.state == ConnectionState.CONNECTED:
         command: str = payload.get("value", "")
@@ -83,7 +83,7 @@ async def handle_command(session: MudSession, ws: WebSocket, public_id: str, pay
 
 
 async def handle_raw_command(session: MudSession, public_id: str, raw_msg: str) -> None:
-    """Processa comando bruto (backward compatibility)"""
+    """Processes raw command (backward compatibility)"""
     log_state_read(session.state, f"raw_command_{public_id}")
     if session.writer and session.state == ConnectionState.CONNECTED:
         await session.send_to_mud((raw_msg + "\n").encode())

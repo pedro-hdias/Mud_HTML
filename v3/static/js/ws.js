@@ -18,11 +18,8 @@ const RECONNECT_MAX_DELAY_MS = CONFIG.WS.reconnectMaxDelayMs;
 // Fila de comandos pendentes (enviados durante reconexão)
 let pendingCommandQueue = [];
 
-// Fila de saída com rate limiting (evita burst de macros)
+// Fila de saída (sem delay, envia direto)
 let _outgoingQueue = [];
-let _outgoingTimer = null;
-const COMMAND_SEND_MIN_MS = 20;
-const COMMAND_SEND_MAX_MS = 200;
 
 // Idempotency guard for disconnect cleanup
 let _disconnectGuard = false;
@@ -87,42 +84,18 @@ function sendMessage(type, payload = {}, meta = {}) {
 // UX: Latência — timestamp do último envio para medir round-trip
 let _lastSendTimestamp = 0;
 
-// ===== Outgoing command queue (rate-limited to avoid burst sends) =====
+// ===== Outgoing command queue (no delay, sends immediately) =====
 
-function _randomSendDelay() {
-    return Math.floor(Math.random() * (COMMAND_SEND_MAX_MS - COMMAND_SEND_MIN_MS + 1)) + COMMAND_SEND_MIN_MS;
-}
-
-function _scheduleNextQueuedCommand() {
-    if (_outgoingQueue.length === 0 || !ws || ws.readyState !== WebSocket.OPEN) {
-        _outgoingTimer = null;
-        return;
-    }
-    const delay = _randomSendDelay();
-    _outgoingTimer = setTimeout(() => {
-        if (_outgoingQueue.length === 0 || !ws || ws.readyState !== WebSocket.OPEN) {
-            _outgoingTimer = null;
-            return;
-        }
+function _processQueuedCommands() {
+    while (_outgoingQueue.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
         const cmd = _outgoingQueue.shift();
         lastCommandSent = cmd;
         sendMessage("command", { value: cmd });
-        wsLogger.debug("Sent queued command", cmd, `(${_outgoingQueue.length} remaining, delay=${delay}ms)`);
-        _scheduleNextQueuedCommand();
-    }, delay);
-}
-
-function _startOutgoingQueue() {
-    if (!_outgoingTimer) {
-        _scheduleNextQueuedCommand();
+        wsLogger.debug("Sent queued command", cmd, `(${_outgoingQueue.length} remaining)`);
     }
 }
 
 function _stopOutgoingQueue() {
-    if (_outgoingTimer) {
-        clearTimeout(_outgoingTimer);
-        _outgoingTimer = null;
-    }
     _outgoingQueue = [];
 }
 
@@ -189,7 +162,7 @@ function scheduleReconnect() {
         StateStore.setAllowReconnect(false);
         StateStore.setIsReconnecting(false);
         updateConnectionState("DISCONNECTED");
-        UIHelpers.appendSystemMessage("[SISTEMA] Falha ao reconectar após várias tentativas. Clique em 'Login' para tentar novamente.", "red");
+        UIHelpers.appendSystemMessage("[SYSTEM] Failed to reconnect after multiple attempts. Click 'Login' to try again.", "red");
         return;
     }
 
@@ -274,6 +247,9 @@ function handleWebSocketMessage(event) {
             case "line":
                 handleLineMessage(msg.payload || {});
                 break;
+            case "menu":
+                handleMenuMessage(msg.payload || {});
+                break;
             case "system":
                 handleSystemMessage(msg.payload || {});
                 break;
@@ -310,7 +286,7 @@ function handleWebSocketClose(event) {
     // Código 4003 = sessão inválida (owner ou manual disconnect)
     if (event.code === 4003) {
         wsLogger.warn("Session invalidated by server - generating new session");
-        sysMessage = "[SISTEMA] Sessão inválida. Clique em 'Login' para conectar novamente.";
+        sysMessage = "[SYSTEM] Invalid session. Click 'Login' to connect again.";
         sysColor = "orange";
 
         handleDisconnect("session_invalidated_4003");
@@ -319,7 +295,7 @@ function handleWebSocketClose(event) {
         StateStore.setAllowReconnect(false);
         updateConnectionState("DISCONNECTED");
     } else if (StateStore.isManualDisconnect()) {
-        sysMessage = "[SISTEMA] Desconectado";
+        sysMessage = "[SYSTEM] Disconnected";
         handleDisconnect("manual_disconnect");
         // Limpa sessão em desconexão manual
         StorageManager.clearSession();
@@ -336,7 +312,7 @@ function handleWebSocketClose(event) {
 
         handleDisconnect("connection_lost_reconnecting");
         if (reconnectAttempts === 0) {
-            sysMessage = "[SISTEMA] Conexão perdida - tentando reconectar...";
+            sysMessage = "[SYSTEM] Connection lost - trying to reconnect...";
         }
         updateConnectionState("RECONNECTING");
         scheduleReconnect();
@@ -379,7 +355,7 @@ function handleInitOkMessage(payload) {
         wsLogger.log("New session created");
     } else if (payload.status === "recovered") {
         wsLogger.log("Session recovered successfully");
-        UIHelpers.appendSystemMessage("[SISTEMA] Sessão recuperada com sucesso!", "#4CAF50");
+        UIHelpers.appendSystemMessage("[SYSTEM] Session recovered successfully!", "#4CAF50");
     }
 
     // Se há credenciais salvas, estamos reconectando
@@ -409,7 +385,7 @@ function handleSessionInvalidMessage(payload) {
         message: payload.message
     });
 
-    UIHelpers.appendSystemMessage(`[SISTEMA] ${payload.message}`, "orange");
+    UIHelpers.appendSystemMessage(`[SYSTEM] ${payload.message}`, "orange");
 
     // O WebSocket será fechado pelo servidor com código 4003
     // O handler onclose cuidará da limpeza e reconexão
@@ -437,7 +413,7 @@ function handleStateMessage(payload) {
 
 function handleErrorMessage(payload) {
     wsLogger.error("Server error", payload.message);
-    UIHelpers.appendSystemMessage("[ERRO] " + payload.message, "red");
+    UIHelpers.appendSystemMessage("[ERROR] " + payload.message, "red");
 }
 
 function handleHistoryMessage(payload) {
@@ -454,13 +430,7 @@ function handleLineMessage(payload) {
 
     if (!payload.content) return;
 
-    // Tenta processar como parte de um menu interativo
-    const isMenuLine = MenuManager.processLine(payload.content, output);
-
-    // Se não for linha de menu, processa normalmente
-    if (!isMenuLine) {
-        UIHelpers.appendOutputLine(payload.content.trimEnd());
-    }
+    UIHelpers.appendOutputLine(payload.content.trimEnd());
 
     PromptDetector.setLastLine(payload.content);
 
@@ -484,10 +454,26 @@ function handleLineMessage(payload) {
     // Detect in-game signals to transition session phase
     detectSessionPhaseFromLine(payload.content);
 
-    // Verifica se é um prompt de confirmação (apenas se não for menu)
-    if (!isMenuLine && PromptDetector.shouldShowConfirmPrompt(payload.content)) {
+    // Verifica se é um prompt de confirmação
+    if (PromptDetector.shouldShowConfirmPrompt(payload.content)) {
         const promptMessage = PromptDetector.buildConfirmMessage(payload.content);
         showConfirmModal(promptMessage);
+    }
+}
+
+function handleMenuMessage(payload) {
+    const output = getElement(CONFIG.SELECTORS.output);
+    if (!output) return;
+
+    if (!payload || !Array.isArray(payload.options) || payload.options.length === 0) {
+        wsLogger.warn("Invalid menu payload", payload);
+        return;
+    }
+
+    if (typeof MenuManager !== "undefined" && typeof MenuManager.renderBackendMenu === "function") {
+        MenuManager.renderBackendMenu(payload, output);
+    } else {
+        wsLogger.warn("MenuManager not available for backend menu payload");
     }
 }
 
@@ -506,7 +492,7 @@ function detectSessionPhaseFromLine(line) {
 }
 
 function handleSystemMessage(payload) {
-    UIHelpers.appendSystemMessage("[SISTEMA] " + payload.message);
+    UIHelpers.appendSystemMessage("[SYSTEM] " + payload.message);
 }
 
 // ===== Funkcionalidade: Dividir comandos por `;` =====
@@ -522,8 +508,8 @@ function splitCommands(commandText) {
 }
 
 /**
- * Envia comando para o servidor.
- * Single commands are sent directly; multiple commands (macro) are rate-queued.
+ * Envia comando para o servidor sem delay.
+ * Single commands and macros are sent immediately.
  */
 function sendCommand(commandText) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -531,32 +517,32 @@ function sendCommand(commandText) {
         if (StateStore.isReconnecting() && pendingCommandQueue.length < CONFIG.COMMAND_QUEUE_MAX) {
             pendingCommandQueue.push(commandText);
             wsLogger.log("Command queued during reconnect", commandText, `(${pendingCommandQueue.length} in queue)`);
-            UIHelpers.appendSystemMessage(`[SISTEMA] Comando enfileirado (reconectando...) [${pendingCommandQueue.length}/${CONFIG.COMMAND_QUEUE_MAX}]`, "#888");
+            UIHelpers.appendSystemMessage(`[SYSTEM] Command queued (reconnecting...) [${pendingCommandQueue.length}/${CONFIG.COMMAND_QUEUE_MAX}]`, "#888");
             return;
         }
         wsLogger.error("Cannot send command - WebSocket not connected");
-        UIHelpers.appendSystemMessage("[SISTEMA] Não conectado - reconectando...", "orange");
+        UIHelpers.appendSystemMessage("[SYSTEM] Not connected - reconnecting...", "orange");
         return;
     }
 
     const commands = splitCommands(commandText);
     if (commands.length === 0) return;
 
-    if (commands.length === 1 && _outgoingQueue.length === 0) {
-        // Single command with no pending queue: send directly (low latency)
+    if (commands.length === 1) {
+        // Single command: send directly (low latency)
         lastCommandSent = commands[0];
         wsLogger.log("Sending command", commands[0]);
         sendMessage("command", { value: commands[0] });
         return;
     }
 
-    // Multiple commands (macro), or single command appended to in-flight queue:
-    // enqueue with rate limiting to preserve ordering
-    if (commands.length > 1) {
-        wsLogger.log(`Enqueued macro: count=${commands.length}`);
-    }
-    commands.forEach(cmd => _outgoingQueue.push(cmd));
-    _startOutgoingQueue();
+    // Multiple commands (macro): send each directly without delay
+    wsLogger.log(`Sending macro: count=${commands.length}`);
+    commands.forEach(cmd => {
+        lastCommandSent = cmd;
+        sendMessage("command", { value: cmd });
+        wsLogger.debug("Sent macro command", cmd);
+    });
 }
 
 /**
@@ -575,7 +561,7 @@ function flushPendingCommands() {
     }
 
     if (queued.length > 0) {
-        UIHelpers.appendSystemMessage(`[SISTEMA] ${queued.length} comando(s) enfileirado(s) enviado(s).`, "#4CAF50");
+        UIHelpers.appendSystemMessage(`[SYSTEM] ${queued.length} queued command(s) sent.`, "#4CAF50");
     }
 }
 
@@ -621,6 +607,6 @@ function cancelReconnectAttempt() {
         ws.close();
     }
 
-    UIHelpers.appendSystemMessage("[SISTEMA] Reconexão cancelada.", "orange");
+    UIHelpers.appendSystemMessage("[SYSTEM] Reconnection cancelled.", "orange");
 }
 

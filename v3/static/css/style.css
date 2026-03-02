@@ -517,6 +517,75 @@ body {
     cursor: default;
 }
 
+/* Feedback de digitação para menus multi-dígito */
+.menu-input-feedback {
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    background: #2a2a2a;
+    border: 2px solid #ffc107;
+    border-radius: 4px;
+    color: #ffc107;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    text-align: center;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.menu-input-feedback.error {
+    border-color: #dc3545;
+    color: #dc3545;
+    animation: shake 0.3s ease-in-out;
+}
+
+.menu-input-feedback.abort {
+    border-color: #6c757d;
+    color: #adb5bd;
+    animation: fadeOut 1.5s ease-in-out;
+}
+
+@keyframes pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes shake {
+
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+@keyframes fadeOut {
+    0% {
+        opacity: 1;
+    }
+
+    70% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
 /* Suporte para alto contraste */
 @media (prefers-contrast: high) {
     .menu-option {

@@ -4,7 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from .ws import websocket_endpoint, session_manager
 from .logger import get_logger, get_current_log_file_path
-from .config import DEBUG_API_SECRET, WS_CLOSE_CODES
+from .sounds.registry import get_registry
+from .config import DEBUG_API_SECRET, WS_CLOSE_CODES, AUDIO_DEBUG_DETAILS
 import os
 import asyncio
 import aiofiles
@@ -17,6 +18,13 @@ async def lifespan(app):
     # Startup
     await session_manager.invalidate_all_sessions()
     logger.info("Previous sessions invalidated")
+
+    registry = get_registry(force_refresh=True)
+    registry_stats = registry.get_stats()
+    logger.info(f"Audio inventory loaded: {registry_stats['total_files']} arquivos de áudio encontrados")
+    if AUDIO_DEBUG_DETAILS:
+        logger.info(f"Audio inventory (debug) por categoria: {registry_stats['categories']}")
+
     await session_manager.start_cleanup_task()
     logger.info("Session cleanup task started")
     
@@ -173,3 +181,94 @@ async def logs_stream(request: Request):
 # ============================================================================
 # FIM DO LOG VIEWER - REMOVER ATÉ AQUI
 # ============================================================================
+# ============================================================================
+# DIAGNÓSTICO DE ÁUDIO
+# ============================================================================
+
+@app.get("/api/audio/diagnostic")
+async def audio_diagnostic():
+    """Retorna diagnóstico completo do sistema de áudio com métricas de performance."""
+    from .sounds.engine import PrometheusSoundEngine
+    from .sounds.registry import get_registry
+    
+    try:
+        engine = PrometheusSoundEngine()
+        registry = get_registry()
+        
+        # 📊 NOVAS MÉTRICAS: Performance stats
+        perf_stats = engine.get_performance_stats()
+        
+        return {
+            "status": "OK",
+            "engine": {
+                "total_rules": len(engine._rules),
+                "cached_matchers": perf_stats["cached_matchers"],
+                "cache_coverage": perf_stats["cache_coverage"],
+            },
+            "registry": {
+                **registry.get_stats(),
+            },
+            "performance": {
+                "matcher_cache_coverage": perf_stats["cache_coverage"],
+                "last_line": perf_stats["last_line_processed"],
+            },
+            "diagnostic_report": engine.get_diagnostic_report(),
+        }
+    except Exception as e:
+        logger.exception(f"Erro no diagnóstico de áudio: {e}")
+        return {
+            "status": "ERROR",
+            "error": str(e),
+        }
+
+
+@app.get("/api/audio/performance-metrics")
+async def audio_performance_metrics():
+    """Retorna métricas detalhadas de performance do motor de áudio."""
+    from .sounds.engine import PrometheusSoundEngine
+    
+    try:
+        engine = PrometheusSoundEngine()
+        stats = engine.get_performance_stats()
+        
+        return {
+            "status": "OK",
+            "metrics": stats,
+            "cache_efficiency": {
+                "compiled": stats["cached_matchers"],
+                "total_rules": stats["total_rules"],
+                "coverage_percentage": stats["cache_coverage"],
+                "benefit": "Matchers compilados en cache evitan recompilação en cada línea procesada"
+            },
+            "timestamp": stats["timestamp"],
+        }
+    except Exception as e:
+        logger.exception(f"Erro ao carregar métrcas: {e}")
+        return {
+            "status": "ERROR",
+            "error": str(e),
+        }
+
+
+@app.get("/api/sounds/validate/{sound_path:path}")
+async def validate_sound(sound_path: str):
+    """Verifica se som existe e retorna caminho normalizado."""
+    from .sounds.registry import get_registry
+    
+    try:
+        registry = get_registry()
+        normalized = registry.get(sound_path)
+        
+        return {
+            "requested": sound_path,
+            "normalized": normalized,
+            "valid": normalized is not None,
+            "available_similar": registry.find_similar(sound_path, max_results=5) if not normalized else [],
+        }
+    except Exception as e:
+        logger.exception(f"Erro ao validar som: {e}")
+        return {
+            "requested": sound_path,
+            "valid": False,
+            "error": str(e),
+        }

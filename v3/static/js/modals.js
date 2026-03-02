@@ -107,5 +107,14 @@ const ModalManager = {
         } catch (e) {
             modalsLogger.error("Error hiding confirm modal", e);
         }
+    },
+
+    dismissConfirmModal() {
+        try {
+            modalsLogger.log("Dismissing confirm modal without sending response");
+            this.hideConfirmModal();
+        } catch (e) {
+            modalsLogger.error("Error dismissing confirm modal", e);
+        }
     }
 };

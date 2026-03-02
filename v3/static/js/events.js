@@ -210,8 +210,8 @@ const EventManager = {
         if (confirmModal) {
             confirmModal.addEventListener("click", (e) => {
                 if (e.target === confirmModal) {
-                    eventsLogger.log("Confirm modal backdrop clicked");
-                    this.sendConfirmNo();
+                    eventsLogger.log("Confirm modal backdrop clicked - dismissing without response");
+                    ModalManager.dismissConfirmModal();
                 }
             }, { signal: this._abortController.signal });
         }
@@ -250,9 +250,12 @@ const EventManager = {
                 if (e.key.toLowerCase() === "y") {
                     eventsLogger.log("Y pressed: confirm yes");
                     this.sendConfirmYes();
-                } else if (e.key.toLowerCase() === "n" || e.key === "Escape") {
-                    eventsLogger.log("N/Escape pressed: confirm no");
+                } else if (e.key.toLowerCase() === "n") {
+                    eventsLogger.log("N pressed: confirm no");
                     this.sendConfirmNo();
+                } else if (e.key === "Escape") {
+                    eventsLogger.log("Escape pressed: dismissing without response");
+                    ModalManager.dismissConfirmModal();
                 } else if (e.key === "Enter") {
                     eventsLogger.log("Enter pressed: confirm yes");
                     this.sendConfirmYes();
@@ -331,30 +334,37 @@ const EventManager = {
         const isNowEnabled = SoundInterceptor.toggleAutoPlay();
         const btn = getElement(CONFIG.SELECTORS.btnSoundToggle);
         if (btn) {
-            btn.textContent = isNowEnabled ? "🔊 Áudio: ON" : "🔊 Áudio: OFF";
+            btn.textContent = isNowEnabled ? "🔊 Audio: ON" : "🔊 Audio: OFF";
             btn.classList.toggle("active", isNowEnabled);
         }
 
         eventsLogger.log("Sound auto-play toggled:", isNowEnabled);
     },
 
-    handleSendClick() {
-        if (StateStore.getConnectionState() !== "CONNECTED") {
-            eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
-            return;
-        }
 
+
+    handleSendClick() {
         const input = getElement(CONFIG.SELECTORS.input);
         if (!input) return;
 
         const command = input.value.trim();
         if (command) {
+            if (StateStore.getConnectionState() !== "CONNECTED") {
+                eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
+                return;
+            }
+
             eventsLogger.log("Sending command", command);
             this._pushCommandHistory(command);
             sendCommand(command);
             input.value = "";
             input.focus();
             UIHelpers.flashInput();
+            return;
+        }
+
+        if (StateStore.getConnectionState() !== "CONNECTED") {
+            eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
             return;
         }
 
@@ -365,7 +375,7 @@ const EventManager = {
                 sendCommand(lastCommand);
                 input.focus();
                 UIHelpers.flashInput();
-                UIHelpers.appendSystemMessage(`[reenvio] ${lastCommand}`, "#888");
+                UIHelpers.appendSystemMessage(`[resend] ${lastCommand}`, "#888");
                 return;
             }
         }

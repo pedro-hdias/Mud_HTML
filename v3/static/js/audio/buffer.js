@@ -10,13 +10,36 @@
      */
     async function _loadBuffer(url) {
         const { state, _ensureCtx } = _MudAudio;
-        if (state.bufferCache[url]) return state.bufferCache[url];
-        const resp = await fetch(url);
-        if (!resp.ok) throw new Error(`Falha ao carregar áudio: ${url} (${resp.status})`);
-        const arrayBuf = await resp.arrayBuffer();
-        const decoded = await _ensureCtx().decodeAudioData(arrayBuf);
-        state.bufferCache[url] = decoded;
-        return decoded;
+
+        // Verificar cache
+        if (state.bufferCache[url]) {
+            console.log("[Audio] Buffer cache hit:", url);
+            return state.bufferCache[url];
+        }
+
+        console.log("[Audio] Fetching sound file:", url);
+
+        try {
+            const resp = await fetch(url);
+
+            if (!resp.ok) {
+                const error = new Error(`[Audio] Failed to load: ${url} (HTTP ${resp.status})`);
+                console.error(error.message);
+                throw error;
+            }
+
+            const arrayBuf = await resp.arrayBuffer();
+            console.log(`[Audio] Decoding audio (${(arrayBuf.byteLength / 1024).toFixed(1)}KB):`, url);
+
+            const decoded = await _ensureCtx().decodeAudioData(arrayBuf);
+            state.bufferCache[url] = decoded;
+
+            console.log(`[Audio] Successfully loaded: ${url}`);
+            return decoded;
+        } catch (err) {
+            console.error(`[Audio] Error loading ${url}:`, err);
+            throw err;
+        }
     }
 
     _MudAudio._loadBuffer = _loadBuffer;

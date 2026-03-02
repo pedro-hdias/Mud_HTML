@@ -106,8 +106,8 @@ const CONFIG = {
     // Fila de comandos pendentes (quando desconectado temporariamente)
     COMMAND_QUEUE_MAX: 10,
 
-    // Menu interativo
-    MENU_TIMEOUT_MS: 2500,
+    // Menu: tempo de espera para digitação de opções multi-dígito (ms)
+    MENU_INPUT_DELAY_MS: 800,
 
     // Cookie config
     COOKIE_EXPIRY_DAYS: 30

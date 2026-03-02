@@ -25,7 +25,7 @@ logger = get_logger("ws")
 
 
 async def websocket_endpoint(ws: WebSocket):
-    """Endpoint WebSocket - gerencia conexões de clientes"""
+    """WebSocket endpoint - manages client connections"""
     await ws.accept()
     
     session = None
@@ -50,7 +50,7 @@ async def websocket_endpoint(ws: WebSocket):
                 
                 if not public_id:
                     logger.error("No publicId provided in init message")
-                    await ws.send_json(make_message("error", {"message": "publicId obrigatório"}))
+                    await ws.send_json(make_message("error", {"message": "publicId is required"}))
                     return
                 
                 logger.info(f"Client initialized with publicId: {public_id}")
@@ -63,13 +63,13 @@ async def websocket_endpoint(ws: WebSocket):
                     logger.error(f"Session validation failed: {status}")
                     
                     if status == "invalid_ownership":
-                        error_msg = "Sessão pertence a outro cliente. Gerando nova sessão..."
+                        error_msg = "Session belongs to another client. Generating new session..."
                     elif status == "manual_disconnect":
-                        error_msg = "Sessão foi encerrada. Gerando nova sessão..."
+                        error_msg = "Session was closed. Generating new session..."
                     elif status == "max_sessions":
-                        error_msg = "Servidor lotado. Tente novamente mais tarde."
+                        error_msg = "Server at capacity. Try again later."
                     else:
-                        error_msg = "Sessão inválida. Gerando nova sessão..."
+                        error_msg = "Invalid session. Generating new session..."
                     
                     close_code = WS_CLOSE_CODES["max_sessions"] if status == "max_sessions" else WS_CLOSE_CODES["session_invalid"]
                     await ws.send_json(make_message("session_invalid", {
@@ -99,12 +99,12 @@ async def websocket_endpoint(ws: WebSocket):
                 }))
             else:
                 logger.error(f"Expected 'init' message, got '{msg_type}'")
-                await ws.send_json(make_message("error", {"message": "Primeiro envie mensagem 'init'"}))
+                await ws.send_json(make_message("error", {"message": "First send 'init' message"}))
                 return
         
         except ValueError:
             logger.error("Invalid JSON in initial message")
-            await ws.send_json(make_message("error", {"message": "JSON inválido"}))
+            await ws.send_json(make_message("error", {"message": "Invalid JSON"}))
             return
         
         # Rate limiting: janela deslizante de timestamps
@@ -120,7 +120,7 @@ async def websocket_endpoint(ws: WebSocket):
             message_timestamps.append(now)
             if len(message_timestamps) > WS_RATE_LIMIT_MAX_MESSAGES:
                 logger.warning(f"Session {public_id}: Rate limit exceeded ({len(message_timestamps)} msgs in {WS_RATE_LIMIT_WINDOW_SECONDS}s)")
-                await ws.send_json(make_message("error", {"message": "Muitas mensagens. Aguarde um momento."}))
+                await ws.send_json(make_message("error", {"message": "Too many messages. Please wait."}))
                 continue
 
             try:
