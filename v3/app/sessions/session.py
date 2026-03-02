@@ -11,6 +11,7 @@ from fastapi import WebSocket
 
 from ..mud.state import ConnectionState, log_state_change, log_state_read
 from ..mud import parser
+from ..mud.menu_detector import MenuDetector
 from ..config import (
     MUD_HOST,
     MUD_PORT,
@@ -43,6 +44,7 @@ class MudSession:
         self.last_activity = datetime.now()
         self.manual_disconnect = False  # Flag para desconexão intencional
         self.sound_engine = get_sound_engine()
+        self.menu_detector = MenuDetector()
         
         logger.info(f"Session created: {public_id} (owner: {self.owner_token[:8]}...)")
     
@@ -207,11 +209,22 @@ class MudSession:
                         }))
                         return
 
-                    sound_events = self.sound_engine.process_line(line)
-                    if sound_events:
-                        await self.broadcast_message(make_message("sound", {"events": sound_events}))
+                    menu_outputs = self.menu_detector.process_line(line)
 
-                    await self.broadcast_message(make_message("line", {"content": line}))
+                    for output_item in menu_outputs:
+                        if output_item.get("type") == "menu":
+                            await self.broadcast_message(make_message("menu", output_item.get("payload", {})))
+                            continue
+
+                        output_line = output_item.get("content", "")
+                        if not output_line:
+                            continue
+
+                        sound_events = self.sound_engine.process_line(output_line)
+                        if sound_events:
+                            await self.broadcast_message(make_message("sound", {"events": sound_events}))
+
+                        await self.broadcast_message(make_message("line", {"content": output_line}))
 
                 # Se sobrou algo no buffer e parece ser um prompt (curto e sem newline), envia também
                 # Isso resolve o problema de telas de login/prompts que não enviam \n

@@ -80,7 +80,7 @@ const SoundHandler = (() => {
         // Concatena prefixo do servidor com o caminho do arquivo
         const fullPath = "/static/sounds/" + path;
 
-        log("debug", `Playing sound`, {
+        log("debug", `[PlaySound] Tentativa`, {
             path,
             fullPath,
             channel,
@@ -101,13 +101,25 @@ const SoundHandler = (() => {
                 audioId = await window.MudAudio.play(fullPath, 0, pan, volume);
             }
 
+            log("info", `[PlaySound] ✓ Successfully playing`, {
+                path,
+                audioId,
+                soundId,
+                fullPath
+            });
+
             // Armazena referência do som para possível parada posterior
             if (soundId) {
                 soundRefs[soundId] = audioId;
-                log("debug", `Sound registered`, { soundId, audioId });
+                log("debug", `[PlaySound] Registered sound ref`, { soundId, audioId });
             }
         } catch (err) {
-            log("error", `Failed to play sound: ${path}`, err.message);
+            log("error", `[PlaySound] ✗ Failed to play sound`, {
+                path,
+                fullPath,
+                error: err.message,
+                stack: err.stack
+            });
         }
     }
 

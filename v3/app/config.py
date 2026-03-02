@@ -28,6 +28,11 @@ HISTORY_MAX_LINES: Final[int] = 4000
 # Definir via variável de ambiente em produção. Vazio = sem proteção (dev mode).
 DEBUG_API_SECRET: Final[str] = os.environ.get("DEBUG_API_SECRET", "")
 
+# Debug de áudio (logs detalhados por categoria)
+AUDIO_DEBUG_DETAILS: Final[bool] = os.environ.get("AUDIO_DEBUG_DETAILS", "0").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+
 # Códigos de fechamento WebSocket (reutilizáveis em ws.py e ws_handlers.py)
 WS_CLOSE_CODES: Final[Dict[str, int]] = {
     "session_invalid": 4003,

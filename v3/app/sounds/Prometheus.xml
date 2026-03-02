@@ -118,7 +118,7 @@ requires="5.00"></plugin>
 <trigger enabled="y" match="^\#\$\#PrometheusKeepAlive$" omit_from_log="y"
   omit_from_output="y" regexp="y" send_to="12" sequence="100"> </trigger>
 <trigger enabled="y"
-  match="^An (X-Loritan .+|alien creature) (kicks|punches) (you|.+) in (.+)\.$"
+  match="^An (X\-Loritan .+|alien creature) (kicks|punches) (you|.+) in (.+)\.$"
   ignore_case="y" regexp="y" send_to="12" sequence="100">
   <send> if (string.match("%2", "kicks")) then
     CurrentGlobalSound = PlayGlobalSound("Combat/Ground/Fight/Neuter/"..math.random(1, 20)..".ogg")
@@ -127,7 +127,7 @@ requires="5.00"></plugin>
     CurrentGlobalSound = PlayGlobalSound("Combat/Ground/Fight/Neuter/"..math.random(1, 20)..".ogg")
     CurrentGlobalSound = PlayGlobalSound("Socials/Punch"..math.random(1, 10)..".ogg")
   end </send> </trigger>
-<trigger enabled="y" match="^([-]+)$" omit_from_output="y" regexp="y"
+<trigger enabled="y" match="^([\-]+)$" omit_from_output="y" regexp="y"
   sequence="100"> </trigger>
 <trigger enabled="y" match="[Input]" ignore_case="n" send_to="12" sequence="100">
   <send> CurrentGlobalSound = PlayGlobalSound("General/Misc/Prompt.ogg")
@@ -188,7 +188,7 @@ Execute("history_add All=%0")
 Execute("history_add "..prometheus.util.Explode("%1", "-")[1].."=%2")
 end
 CurrentGlobalSound = PlayGlobalSound("General/Channels/%1.ogg")
-if (string.match("%1", "OOC") and string.match("%2", "A pre-recorded message")) then
+if (string.match("%1", "OOC") and string.match("%2", "A pre\-recorded message")) then
 CurrentGlobalSound = PlayGlobalSound("General/Hosts/Announcement.ogg")
 elseif (string.match("%1", "General") and string.match("%2", "UTF Communications Officer")) then
 CurrentGlobalSound = PlayGlobalSound("General/Misc/Alarm.ogg")
@@ -214,7 +214,7 @@ CurrentGlobalSound = PlayGlobalSound("General/Comm/FlightControlEnemiesEntering.
 elseif (string.match("%2", "retreating")) then
 CurrentGlobalSound = PlayGlobalSound("General/Comm/FlightControlEnemiesRetreating.ogg")
 elseif (string.match("%2", "destroyed")) then
-if not string.match("%2", "X-Loritan") then
+if not string.match("%2", "X\-Loritan") then
 CurrentGlobalSound = PlayGlobalSound("Combat/Space/OtherDestroyed"..math.random(1, 8)..".ogg")
 end
 elseif (string.match("%1","Commpipe")) then
@@ -461,7 +461,7 @@ StopSound(CurrentRoomSound)
   <send>CurrentGlobalSound = PlayGlobalSound("Socials/Say.ogg")
   </send></trigger>
 <trigger enabled="y" match="You hear the roar of * starship from outside."
-  omit_from_output="y" send_to="12" sequence="100">
+  omit_from_output="y" send_to="12"sequence="100">
   <send> if ("%1" == "launching" or "%1" == "undocking") then
       CurrentGlobalSound = PlayGlobalSound("Starship/Move/OtherLaunching"..math.random(1, 3)..".ogg",
         math.random(-100, 100))
@@ -835,7 +835,7 @@ StopSound(CurrentRoomSound)
     elseif (string.match("%1", "is 1 unit away")) then
       CurrentGlobalSound = PlayGlobalSound("Starship/Computer/OneUnitAway.ogg")
     elseif (string.match("%1", "destroyed")) then
-      if (string.match("%1", "X-Loritan")) then
+      if (string.match("%1", "X\-Loritan")) then
         CurrentCombatSound = PlayCombatSound("Space/OtherDestroyed"..math.random(1, 8)..".ogg")
       else
         CurrentGlobalSound = PlayGlobalSound("Combat/Space/OtherDestroyed"..math.random(1, 8)..".ogg")
@@ -2879,7 +2879,7 @@ send_to="12"
 sequence="100"
 >
 <send>
-if (string.match("%1", "X-Loritan") and string.match("%2", "entered")) then
+if (string.match("%1", "X\-Loritan") and string.match("%2", "entered")) then
 CurrentGlobalSound = PlayGlobalSound("Starship/Move/EnterSector"..math.random(1, 2)..".ogg")
 CurrentGlobalSound = PlayGlobalSound("Starship/Computer/EnemyDetected.ogg")
 elseif (string.match("%2", "jumped into")) then
@@ -2887,7 +2887,7 @@ CurrentGlobalSound = PlayGlobalSound("Starship/Move/EnterSector"..math.random(1,
 CurrentGlobalSound = PlayGlobalSound("Starship/Computer/EnemyDetected.ogg")
 elseif (string.match("%2", "left")) then
 CurrentGlobalSound = PlayGlobalSound("Starship/Move/ExitSector"..math.random(1, 2)..".ogg")
-elseif (string.match("%1", "X-Loritan") and string.match("%2", "jumped out of")) then
+elseif (string.match("%1", "X\-Loritan") and string.match("%2", "jumped out of")) then
 CurrentGlobalSound = PlayGlobalSound("Starship/Move/ExitSector"..math.random(1, 2)..".ogg")
 end
 </send>
@@ -3768,7 +3768,7 @@ sequence="100"
 <send>
 if (string.match("%2", "missile")) then
 CurrentCombatSound = PlayCombatSound("Space/OtherMissiles.ogg")
-if (string.match("%1", "X-Loritan Assassin")) then
+if (string.match("%1", "X\-Loritan Assassin")) then
 CurrentCombatSound = PlayCombatSound("Space/GrapeShot.ogg")
 end
 Note("%0")
@@ -4137,7 +4137,7 @@ send_to="14"
 sequence="100"
 >
 <send>
-if (string.match("%1", "X-Loritan")) then
+if (string.match("%1", "X\-Loritan")) then
 CurrentCombatSound = PlayCombatSound("Space/OtherFired"..math.random(1, 5)..".ogg")
 else
 CurrentCombatSound = PlayCombatSound("Space/OtherFired"..math.random(1, 5)..".ogg")
@@ -4201,7 +4201,7 @@ CurrentGlobalSound = PlayGlobalSound("Starship/Misc/SalvageLaunch.ogg")
 elseif (string.match("%2", "a greenade")) then
 CurrentCombatSound = PlayCombatSound("Ground/GrenadeFire.ogg")
 elseif (string.match("%2", "a massive energy beam")) then
-if (string.match("%1", "X-Loritan") or string.match("%3", "X-Loritan")) then
+if (string.match("%1", "X\-Loritan") or string.match("%3", "X-Loritan")) then
 CurrentCombatSound = PlayCombatSound("Space/OtherFired"..math.random(1, 5)..".ogg")
 else
 CurrentCombatSound = PlayCombatSound("Space/OtherFired"..math.random(1, 5)..".ogg")
@@ -5221,7 +5221,7 @@ send_to="12"
 sequence="100"
 >
 <send>
-if (string.match("%1", "X-Loritan") or string.match("%1", "alien creature")) then
+if (string.match("%1", "X\-Loritan") or string.match("%1", "alien creature")) then
 CurrentCombatSound = PlayCombatSound("Ground/Lores"..math.random(1, 2)..".ogg")
 end
 </send>
@@ -5233,7 +5233,7 @@ send_to="12"
 sequence="100"
 >
 <send>
-if (string.match("%1", "X-Loritan") or string.match("%1", "alien creature")) then
+if (string.match("%1", "X\-Loritan") or string.match("%1", "alien creature")) then
 CurrentCombatSound = PlayCombatSound("Ground/LoreDeath.ogg")
 CurrentCombatSound = PlayCombatSound("Ground/DeathMob"..math.random(1, 5)..".ogg")
 else
@@ -7867,7 +7867,7 @@ send_to="12"
 sequence="100"
 >
 <send>
-if (string.match("%1", "X-Loritan") or string.match("%1", "alien creature")) then
+if (string.match("%1", "X\-Loritan") or string.match("%1", "alien creature")) then
 CurrentGlobalSound = PlayGlobalSound("Combat/Ground/Lores"..math.random(1, 2)..".ogg")
 end -- If.
 </send>
@@ -7881,7 +7881,7 @@ sequence="100"
 <send>
 if (string.match("%1", "of materials") or string.match("%1", "Easter egg") or string.match("%1", "pumpkin") or string.match("%1", "Christmas bell") or string.match("%1", "chocolate box")) then
 CurrentGlobalSound = PlayGlobalSound("General/Misc/EggItem.ogg")
-elseif (string.match("%1", "X-Loritan") or string.match("%1", "alien creature")) then
+elseif (string.match("%1", "X\-Loritan") or string.match("%1", "alien creature")) then
 if (string.match("%1", "corpse") or string.match("%1", "corpses")) then
 -- Play no sound, as corpses don't growl.
 end -- InnerIf.

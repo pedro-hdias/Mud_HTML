@@ -1,5 +1,26 @@
 # Changelog
 
+## v3.1 (2026-03-02)
+
+### Added
+- pacote de áudio modular em `v3/static/js/audio/` com separação por contexto, buffer, registry, playback, controles, estado e ponto de entrada
+- fila de envio de comandos no WebSocket com rate limiting aleatório para macros e preservação de ordem
+- modelo de fase de sessão no front-end (`UNAUTHENTICATED`, `AUTH_IN_PROGRESS`, `IN_GAME`) com transições idempotentes
+- detecção de entrada em jogo por padrões de linha recebida para transição automática de fase
+- tratamento centralizado e idempotente de desconexão para limpeza de fila de saída e reset de menu
+- normalização case-insensitive de caminhos de áudio no interpretador de `send(...)`, retornando capitalização canônica do arquivo
+
+### Changed
+- carregamento de scripts de áudio em `v3/static/index.html` passou de arquivo único para pipeline modular com ordem explícita de dependências
+- resolução de nomes no registry de áudio (`resolve`) agora aceita busca case-insensitive para nomes semânticos
+- detecção de menu em `v3/static/js/menu.js` ganhou terminador por `[Input]`, reset por `Valid commands are:` e redução de logs repetitivos
+- cliques de menu passaram a respeitar fase da sessão (somente durante estado não autenticado)
+- processamento de mensagens WebSocket prioriza log `debug` para payload bruto e sincroniza fase de autenticação no envio de login
+
+### Removed
+- arquivo monolítico `v3/static/js/audio.js`, substituído pelo pacote modular em `v3/static/js/audio/`
+- artefatos binários versionados no repositório raiz: `mud_html_v1.26.02.06.1205.zip`, `mud_html_v1.26.02.07.2233.zip`, `mud_html_v2.26.02.10.2006.zip` e `mud_html_v3.26.02.14.1752.zip`
+
 ## v3 (2026-02-14)
 
 ### Added

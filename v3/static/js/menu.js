@@ -1,6 +1,6 @@
 /**
  * menu.js - Gerenciamento de menus interativos
- * Detecta e renderiza listas numeradas como menus clicáveis
+ * Renderiza menus recebidos do backend como componentes clicáveis
  */
 
 const menuLogger = createLogger("menu");
@@ -8,14 +8,18 @@ const menuLogger = createLogger("menu");
 const MenuManager = {
     // Armazena o menu ativo atual
     currentMenu: null,
-    // Buffer de linhas para detectar menus
-    lineBuffer: [],
-    // Tempo máximo entre linhas de um menu (ms) - configurável via CONFIG
-    menuTimeout: CONFIG.MENU_TIMEOUT_MS || 2500,
-    // Timer para detecção de fim de menu
-    menuTimer: null,
+    // Handler de teclado para atalhos
+    keyboardHandler: null,
     // Número mínimo de opções para considerar como menu
     minMenuOptions: 2,
+<<<<<<< HEAD
+    // Buffer de digitação para opções multi-caractere
+    inputBuffer: "",
+    // Timer para processar buffer
+    inputTimer: null,
+    // Duração máxima das chaves no menu atual
+    maxKeyLength: 1,
+=======
     // Tamanho máximo da chave para ser considerado menu (evita [info], [chat], etc.)
     maxKeyLength: 3,
 
@@ -205,13 +209,14 @@ const MenuManager = {
         this.lineBuffer = [];
         this.activateKeyboardShortcuts();
     },
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
 
     /** Cria o container HTML do menu */
     createMenuContainer(items) {
         const container = document.createElement("nav");
         container.className = "menu-container";
         container.setAttribute("role", "menu");
-        container.setAttribute("aria-label", "Menu de opções interativas");
+        container.setAttribute("aria-label", "Interactive options menu");
 
         const menuList = document.createElement("ul");
         menuList.className = "menu-list";
@@ -227,7 +232,7 @@ const MenuManager = {
                 optionButton.setAttribute("role", "menuitem");
                 optionButton.setAttribute("type", "button");
                 optionButton.dataset.optionKey = item.option.key;
-                optionButton.setAttribute("aria-label", `Opção ${item.option.key}: ${item.option.text}`);
+                optionButton.setAttribute("aria-label", `Option ${item.option.key}: ${item.option.text}`);
                 optionButton.setAttribute("tabindex", index === 0 ? "0" : "-1");
 
                 const numberSpan = document.createElement("span");
@@ -330,11 +335,48 @@ const MenuManager = {
         sendCommand(validOption.key);
     },
 
+    /** Aborta o menu atual enviando comando de abort */
+    abortMenu() {
+        if (!this.currentMenu) return;
+
+        menuLogger.log("Menu aborted via ESC key");
+
+        // Mostra feedback visual de abort
+        const feedback = document.createElement("div");
+        feedback.className = "menu-input-feedback abort";
+        feedback.setAttribute("role", "status");
+        feedback.setAttribute("aria-live", "polite");
+        feedback.textContent = "Menu cancelado (ESC)";
+
+        if (this.currentMenu.container) {
+            this.currentMenu.container.insertBefore(feedback, this.currentMenu.container.firstChild);
+
+            // Remove feedback após 1.5 segundos
+            setTimeout(() => {
+                if (feedback && feedback.parentNode) {
+                    feedback.remove();
+                }
+            }, 1500);
+        }
+
+        // Desativa o menu
+        this.deactivateMenu();
+
+        // Envia comando de abort ('a' é o comando padrão de abort em MUDs)
+        sendCommand("a");
+    },
+
     /** Ativa os atalhos de teclado para o menu */
     activateKeyboardShortcuts() {
         if (this.keyboardHandler) {
             document.removeEventListener("keydown", this.keyboardHandler);
         }
+
+        // Calcula o comprimento máximo das chaves do menu
+        this.maxKeyLength = Math.max(...this.currentMenu.options.map(opt => opt.key.length));
+        this.inputBuffer = "";
+
+        menuLogger.log(`Menu com ${this.currentMenu.options.length} opções, comprimento máximo: ${this.maxKeyLength}`);
 
         this.keyboardHandler = (e) => {
             if (!this.currentMenu) return;
@@ -347,6 +389,68 @@ const MenuManager = {
                 return;
             }
 
+<<<<<<< HEAD
+            // ESC: aborta o menu automaticamente
+            if (e.key === "Escape") {
+                e.preventDefault();
+                this.abortMenu();
+                return;
+            }
+
+            // Enter: processa buffer imediatamente
+            if (e.key === "Enter" && this.inputBuffer) {
+                e.preventDefault();
+                this.processInputBuffer();
+                return;
+            }
+
+            // Backspace: remove último caractere do buffer
+            if (e.key === "Backspace" && this.inputBuffer) {
+                e.preventDefault();
+                this.inputBuffer = this.inputBuffer.slice(0, -1);
+                menuLogger.log(`Buffer após backspace: "${this.inputBuffer}"`);
+
+                // Mostra feedback visual
+                this.updateInputFeedback();
+
+                if (this.inputBuffer) {
+                    this.resetInputTimer();
+                } else {
+                    this.clearInputTimer();
+                }
+                return;
+            }
+
+            // Apenas aceita caracteres alfanuméricos
+            if (!/^[a-zA-Z0-9]$/.test(e.key)) return;
+
+            e.preventDefault();
+
+            // Se menu tem apenas opções de 1 caractere, envia imediatamente
+            if (this.maxKeyLength === 1) {
+                const validOption = this.currentMenu.options.find(opt =>
+                    opt.key.toLowerCase() === e.key.toLowerCase()
+                );
+                if (validOption) {
+                    this.selectOption(e.key);
+                }
+                return;
+            }
+
+            // Menu com opções multi-caractere: usa buffer
+            this.inputBuffer += e.key;
+            menuLogger.log(`Buffer atualizado: "${this.inputBuffer}" (max: ${this.maxKeyLength})`);
+
+            // Mostra feedback visual
+            this.updateInputFeedback();
+
+            // Se buffer já tem o comprimento máximo, processa imediatamente
+            if (this.inputBuffer.length >= this.maxKeyLength) {
+                this.processInputBuffer();
+            } else {
+                // Aguarda mais entrada
+                this.resetInputTimer();
+=======
             // Verifica se é um dígito ou letra (a-z, A-Z, 0-9)
             if (/^[a-zA-Z0-9]$/.test(e.key)) {
                 // Only intercept if the key contributes to a valid option or prefix
@@ -389,12 +493,131 @@ const MenuManager = {
                 e.stopPropagation();
                 this.submitInputBuffer();
                 return;
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
             }
         };
 
         document.addEventListener("keydown", this.keyboardHandler);
     },
 
+<<<<<<< HEAD
+    /** Reseta o timer de input */
+    resetInputTimer() {
+        this.clearInputTimer();
+        this.inputTimer = setTimeout(() => {
+            this.processInputBuffer();
+        }, CONFIG.MENU_INPUT_DELAY_MS || 800);
+    },
+
+    /** Limpa o timer de input */
+    clearInputTimer() {
+        if (this.inputTimer) {
+            clearTimeout(this.inputTimer);
+            this.inputTimer = null;
+        }
+    },
+
+    /** Processa o buffer de input */
+    processInputBuffer() {
+        this.clearInputTimer();
+
+        if (!this.inputBuffer) return;
+
+        const input = this.inputBuffer;
+        this.inputBuffer = "";
+        this.clearInputFeedback();
+
+        const validOption = this.currentMenu.options.find(opt =>
+            opt.key.toLowerCase() === input.toLowerCase()
+        );
+
+        if (validOption) {
+            menuLogger.log(`Opção válida encontrada: ${validOption.key}`);
+            this.selectOption(validOption.key);
+        } else {
+            menuLogger.warn(`Opção inválida: "${input}"`);
+            // Feedback visual de erro
+            this.showInputError(input);
+        }
+    },
+
+    /** Mostra feedback visual do buffer de digitação */
+    updateInputFeedback() {
+        if (!this.currentMenu) return;
+
+        let feedback = this.currentMenu.container.querySelector(".menu-input-feedback");
+        if (!feedback) {
+            feedback = document.createElement("div");
+            feedback.className = "menu-input-feedback";
+            feedback.setAttribute("role", "status");
+            feedback.setAttribute("aria-live", "polite");
+            this.currentMenu.container.insertBefore(feedback, this.currentMenu.container.firstChild);
+        }
+
+        feedback.textContent = `Digitando: ${this.inputBuffer}`;
+        feedback.classList.remove("error");
+    },
+
+    /** Limpa feedback visual */
+    clearInputFeedback() {
+        if (!this.currentMenu) return;
+
+        const feedback = this.currentMenu.container.querySelector(".menu-input-feedback");
+        if (feedback) {
+            feedback.remove();
+        }
+    },
+
+    /** Mostra erro de input inválido */
+    showInputError(input) {
+        if (!this.currentMenu) return;
+
+        let feedback = this.currentMenu.container.querySelector(".menu-input-feedback");
+        if (!feedback) {
+            feedback = document.createElement("div");
+            feedback.className = "menu-input-feedback error";
+            feedback.setAttribute("role", "alert");
+            this.currentMenu.container.insertBefore(feedback, this.currentMenu.container.firstChild);
+        } else {
+            feedback.classList.add("error");
+        }
+
+        feedback.textContent = `Opção inválida: ${input}`;
+
+        setTimeout(() => {
+            if (feedback && feedback.parentNode) {
+                feedback.remove();
+            }
+        }, 2000);
+    },
+
+    /** Renderiza menu recebido do backend */
+    renderBackendMenu(payload, output) {
+        if (!payload || !Array.isArray(payload.options) || payload.options.length < this.minMenuOptions) {
+            menuLogger.warn("Invalid backend menu payload", payload);
+            return;
+        }
+
+        // Desativa menu anterior se existir
+        this.deactivateMenu();
+
+        const items = payload.options.map(option => ({ line: `[${option.key}] ${option.text}`, option }));
+        if (payload.prompt) {
+            items.push({ line: payload.prompt, option: null, isPrompt: true });
+        }
+
+        const menuContainer = this.createMenuContainer(items);
+        output.appendChild(menuContainer);
+        output.scrollTop = output.scrollHeight;
+
+        this.currentMenu = {
+            container: menuContainer,
+            options: payload.options
+        };
+
+        this.activateKeyboardShortcuts();
+        menuLogger.log("Backend menu rendered with", payload.options.length, "options");
+=======
     /** Adiciona um dígito ao buffer */
     addToInputBuffer(digit) {
         // Limita o tamanho do buffer
@@ -526,6 +749,7 @@ const MenuManager = {
         }
 
         menuLogger.log("Input buffer cleared");
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
     },
 
     /** Desativa o menu atual */
@@ -535,8 +759,16 @@ const MenuManager = {
             this.keyboardHandler = null;
         }
 
+<<<<<<< HEAD
+        // Limpa buffer e timer
+        this.clearInputTimer();
+        this.inputBuffer = "";
+        this.maxKeyLength = 1;
+        this.clearInputFeedback();
+=======
         // Limpa o buffer de entrada
         this.clearInputBuffer();
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
 
         if (this.currentMenu) {
             this.currentMenu.container.classList.add("menu-inactive");
@@ -553,14 +785,17 @@ const MenuManager = {
         menuLogger.log("Menu deactivated");
     },
 
-    /** Limpa o buffer e desativa menus */
+    /** Desativa menus ativos */
     reset() {
+<<<<<<< HEAD
+=======
         if (this.menuTimer) {
             clearTimeout(this.menuTimer);
             this.menuTimer = null;
         }
         this.lineBuffer = [];
         this.clearInputBuffer();
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
         this.deactivateMenu();
     }
 };

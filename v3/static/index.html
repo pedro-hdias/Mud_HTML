@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 
 <head>
     <meta charset="UTF-8" />
@@ -15,75 +15,75 @@
 
 <body>
 
-    <!-- Controles superiores -->
+    <!-- Top Controls -->
     <div id="controls">
-        <button id="btnLogin" aria-label="Conectar ao servidor">Login</button>
-        <button id="btnDisconnect" aria-label="Desconectar do servidor" disabled>Desconectar</button>
-        <button id="btnClear" aria-label="Limpar tela" title="Limpar todo o histórico de saída">Limpar Tela</button>
-        <button id="btnSoundToggle" aria-label="Ligar/desligar áudio automático"
-            title="Ativar/desativar reprodução automática de sons">🔊 Áudio: OFF</button>
+        <button id="btnLogin" aria-label="Connect to server">Login</button>
+        <button id="btnDisconnect" aria-label="Disconnect from server" disabled>Disconnect</button>
+        <button id="btnClear" aria-label="Clear screen" title="Clear all output history">Clear Screen</button>
+        <button id="btnSoundToggle" aria-label="Toggle automatic audio"
+            title="Enable/disable automatic sound playback">🔊 Audio: OFF</button>
 
         <div id="statusIndicator">
             <div id="statusDot"></div>
-            <span id="statusText">Desconectado</span>
+            <span id="statusText">Disconnected</span>
         </div>
 
         <div id="reconnectStatus" aria-live="polite" hidden>
-            <span>Reconectando...</span>
-            <button id="btnCancelReconnect" type="button">Cancelar tentativa</button>
+            <span>Reconnecting...</span>
+            <button id="btnCancelReconnect" type="button">Cancel attempt</button>
         </div>
     </div>
 
-    <!-- Área de output -->
+    <!-- Output Area -->
     <div id="output" role="log" aria-live="polite" aria-atomic="false">
     </div>
 
-    <!-- Área de input -->
+    <!-- Input Area -->
     <div id="inputArea">
-        <input id="input" type="text" placeholder="Digite um comando (múltiplos: use ;)" aria-label="Digite um comando"
+        <input id="input" type="text" placeholder="Enter a command (multiple: use ;)" aria-label="Enter a command"
             disabled />
-        <button id="btnSend" aria-label="Enviar comando" title="Enviar comando" disabled>Enviar</button>
+        <button id="btnSend" aria-label="Send command" title="Send command" disabled>Send</button>
     </div>
 
-    <div id="inputHints">Enter para enviar, ; para múltiplos</div>
+    <div id="inputHints">Enter to send, ; for multiple commands</div>
 
-    <!-- Modal de Login -->
+    <!-- Login Modal -->
     <div id="loginModal" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
         <form id="loginForm">
-            <h2 id="loginTitle">Entrar no jogo</h2>
-            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">O servidor está aguardando suas credenciais.
-                Preencha abaixo ou clique em "Digitar Manualmente" para fazer login direto no terminal.</p>
+            <h2 id="loginTitle">Login to Game</h2>
+            <p style="font-size: 0.9em; color: #666; margin-bottom: 15px;">The server is waiting for your credentials.
+                Fill in below or click "Type Manually" to login directly in the terminal.</p>
 
-            <label for="username">Nome de usuário:</label>
+            <label for="username">Username:</label>
             <input type="text" id="username" name="username" required autocomplete="username" />
 
-            <label for="password">Senha:</label>
+            <label for="password">Password:</label>
             <input type="password" id="password" name="password" required autocomplete="current-password" />
 
             <div class="form-check">
                 <input type="checkbox" id="saveSession" name="saveSession" />
-                <label for="saveSession">Salvar credenciais por 30 dias</label>
+                <label for="saveSession">Save credentials for 30 days</label>
             </div>
 
-            <button type="submit">Entrar</button>
+            <button type="submit">Login</button>
             <button type="button" id="btnCancelLogin" style="margin-top: 10px;"
-                title="Fechar popup e digitar login manualmente no terminal">Digitar Manualmente</button>
+                title="Close popup and type login manually in terminal">Type Manually</button>
         </form>
     </div>
 
-    <!-- Modal de Confirmacao -->
+    <!-- Confirmation Modal -->
     <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
         <div id="confirmBox">
-            <h2 id="confirmTitle">Confirmacao</h2>
+            <h2 id="confirmTitle">Confirmation</h2>
             <pre id="confirmText"></pre>
             <div class="confirm-actions">
-                <button type="button" id="btnConfirmYes">Sim</button>
-                <button type="button" id="btnConfirmNo" class="secondary">Nao</button>
+                <button type="button" id="btnConfirmYes">Yes</button>
+                <button type="button" id="btnConfirmNo" class="secondary">No</button>
             </div>
         </div>
     </div>
 
-    <!-- Ordem de carregamento importante: dependências primeiro -->
+    <!-- Important loading order: dependencies first -->
     <script src="/static/js/logger.js"></script>
     <script src="/static/js/config.js"></script>
     <script src="/static/js/storage.js"></script>
@@ -93,7 +93,14 @@
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/events.js"></script>
     <script src="/static/js/ui.js"></script>
-    <script src="/static/js/audio.js"></script>
+    <!-- Modularized audio package (audio/) -->
+    <script src="/static/js/audio/context.js"></script>
+    <script src="/static/js/audio/buffer.js"></script>
+    <script src="/static/js/audio/registry.js"></script>
+    <script src="/static/js/audio/playback.js"></script>
+    <script src="/static/js/audio/controls.js"></script>
+    <script src="/static/js/audio/state.js"></script>
+    <script src="/static/js/audio/index.js"></script>
     <script src="/static/js/sound-handler.js"></script>
     <script src="/static/js/ws.js"></script>
 

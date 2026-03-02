@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 
 <head>
     <meta charset="UTF-8">
@@ -197,24 +197,24 @@
 
 <body>
     <header>
-        <h1>📋 Log Viewer - Tempo Real</h1>
+        <h1>📋 Real-Time Log Viewer</h1>
         <div class="controls">
             <div class="status">
                 <div class="status-indicator" id="statusIndicator"></div>
-                <span id="statusText">Desconectado</span>
+                <span id="statusText">Disconnected</span>
             </div>
-            <button id="pauseBtn">⏸️ Pausar</button>
-            <button id="clearBtn" class="danger">🗑️ Limpar</button>
+            <button id="pauseBtn">⏸️ Pause</button>
+            <button id="clearBtn" class="danger">🗑️ Clear</button>
             <a href="/" style="text-decoration: none;">
-                <button>🏠 Voltar</button>
+                <button>🏠 Back</button>
             </a>
         </div>
     </header>
 
     <div class="filters">
         <div class="filter-group">
-            <label>Buscar:</label>
-            <input type="text" id="searchInput" placeholder="Digite para filtrar logs...">
+            <label>Search:</label>
+            <input type="text" id="searchInput" placeholder="Type to filter logs...">
         </div>
         <div class="filter-group">
             <input type="checkbox" id="filterDebug" checked>
@@ -236,7 +236,7 @@
             <input type="checkbox" id="filterCritical" checked>
             <label for="filterCritical">CRITICAL</label>
         </div>
-        <div class="stats" id="stats">Total: 0 linhas</div>
+        <div class="stats" id="stats">Total: 0 lines</div>
     </div>
 
     <div id="logContainer"></div>
@@ -313,7 +313,7 @@
         }
 
         function updateStats() {
-            statsEl.textContent = `Total: ${totalLines} linhas`;
+            statsEl.textContent = `Total: ${totalLines} lines`;
         }
 
         function connectToStream() {
@@ -325,14 +325,14 @@
 
             eventSource.onopen = () => {
                 statusIndicator.className = 'status-indicator connected';
-                statusText.textContent = 'Conectado';
+                statusText.textContent = 'Connected';
             };
 
             eventSource.onerror = () => {
                 statusIndicator.className = 'status-indicator disconnected';
-                statusText.textContent = 'Desconectado';
+                statusText.textContent = 'Disconnected';
 
-                // Tenta reconectar após 3 segundos
+                // Try to reconnect after 3 seconds
                 setTimeout(() => {
                     if (eventSource.readyState === EventSource.CLOSED) {
                         connectToStream();
@@ -366,10 +366,10 @@
             updateStats();
         }
 
-        // Controles
+        // Controls
         pauseBtn.addEventListener('click', () => {
             isPaused = !isPaused;
-            pauseBtn.textContent = isPaused ? '▶️ Continuar' : '⏸️ Pausar';
+            pauseBtn.textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
 
             if (!isPaused && pendingLogs.length > 0) {
                 pendingLogs.forEach(line => addLogLine(line));
@@ -378,30 +378,30 @@
         });
 
         clearBtn.addEventListener('click', () => {
-            if (confirm('Limpar todos os logs exibidos?')) {
+            if (confirm('Clear all displayed logs?')) {
                 logContainer.innerHTML = '';
                 totalLines = 0;
                 updateStats();
             }
         });
 
-        // Filtros
+        // Filters
         Object.values(filters).forEach(checkbox => {
             checkbox.addEventListener('change', refreshDisplay);
         });
 
         searchInput.addEventListener('input', refreshDisplay);
 
-        // Detecta se usuário está fazendo scroll manual
+        // Detects if user is manually scrolling
         logContainer.addEventListener('scroll', () => {
             const isNearBottom = logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 100;
             autoScroll = isNearBottom;
         });
 
-        // Inicia conexão
+        // Start connection
         connectToStream();
 
-        // Cleanup ao fechar
+        // Cleanup when closing
         window.addEventListener('beforeunload', () => {
             if (eventSource) {
                 eventSource.close();

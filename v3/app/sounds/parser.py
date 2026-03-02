@@ -82,6 +82,7 @@ def _build_rule(raw: Dict[str, Any]) -> TriggerRule:
     match = attrs.get("match") or _extract_attr(body_lines, "match") or ""
     regexp = (attrs.get("regexp") or _extract_attr(body_lines, "regexp") or "").lower() == "y"
     ignore_case = (attrs.get("ignore_case") or _extract_attr(body_lines, "ignore_case") or "").lower() == "y"
+    keep_evaluating = (attrs.get("keep_evaluating") or _extract_attr(body_lines, "keep_evaluating") or "").lower() == "y"
     enabled = (attrs.get("enabled") or "y").lower() == "y"
     sequence = int(attrs.get("sequence") or _extract_attr(body_lines, "sequence") or 0)
     send_to = attrs.get("send_to") or _extract_attr(body_lines, "send_to")
@@ -92,6 +93,7 @@ def _build_rule(raw: Dict[str, Any]) -> TriggerRule:
         match=match,
         regexp=regexp,
         ignore_case=ignore_case,
+        keep_evaluating=keep_evaluating,
         sequence=sequence,
         send_text=send_text,
         send_to=send_to,
