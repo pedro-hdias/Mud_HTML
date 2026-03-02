@@ -517,6 +517,7 @@ body {
     cursor: default;
 }
 
+<<<<<<< HEAD
 /* Feedback de digitação para menus multi-dígito */
 .menu-input-feedback {
     padding: 8px 12px;
@@ -557,6 +558,45 @@ body {
 }
 
 @keyframes shake {
+=======
+/* Buffer de entrada do menu */
+.menu-input-buffer {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    background: #28a745;
+    color: white;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    z-index: 500;
+    animation: bufferPulse 0.2s ease-out;
+    min-width: 50px;
+    text-align: center;
+}
+
+@keyframes bufferPulse {
+    0% {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.menu-input-buffer.invalid {
+    background: #dc3545;
+    animation: bufferShake 0.3s;
+}
+
+@keyframes bufferShake {
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
 
     0%,
     100% {
@@ -572,6 +612,7 @@ body {
     }
 }
 
+<<<<<<< HEAD
 @keyframes fadeOut {
     0% {
         opacity: 1;
@@ -584,6 +625,11 @@ body {
     100% {
         opacity: 0;
     }
+=======
+.menu-input-buffer.ready {
+    background: #ffc107;
+    color: #000;
+>>>>>>> 4207e99a3eed0d5160bdb449c22a58b306b164da
 }
 
 /* Suporte para alto contraste */
