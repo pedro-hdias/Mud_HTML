@@ -728,7 +728,22 @@ body {
     cursor: default;
 }
 
-<<<<<<< HEAD
+/* Menu Container Separado - Accessibility Region */
+#menuContainer {
+    padding: 10px 16px;
+    min-height: auto;
+    border-top: 1px solid #2a2a2a;
+}
+
+#menuContainer:empty {
+    display: none;
+    padding: 0;
+    border: none;
+}
+
+#menuContainer .menu-container {
+    margin: 0;
+}
 
 /* Feedback de digitação para menus multi-dígito */
 .menu-input-feedback {
@@ -757,8 +772,36 @@ body {
     animation: fadeOut 1.5s ease-in-out;
 }
 
-@keyframes pulse {
+/* Buffer de entrada do menu */
+.menu-input-buffer {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    background: #28a745;
+    color: white;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+    z-index: 500;
+    animation: bufferPulse 0.2s ease-out;
+    min-width: 50px;
+    text-align: center;
+}
 
+.menu-input-buffer.invalid {
+    background: #dc3545;
+    animation: bufferShake 0.3s;
+}
+
+.menu-input-buffer.ready {
+    background: #ffc107;
+    color: #000;
+}
+
+@keyframes pulse {
     0%,
     100% {
         opacity: 1;
@@ -770,37 +813,23 @@ body {
 }
 
 @keyframes shake {
-    =======
-
-    /* Buffer de entrada do menu */
-    .menu-input-buffer {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        padding: 12px 16px;
-        background: #28a745;
-        color: white;
-        border-radius: 6px;
-        font-family: 'Courier New', monospace;
-        font-weight: bold;
-        font-size: 18px;
-        box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
-        z-index: 500;
-        animation: bufferPulse 0.2s ease-out;
-        min-width: 50px;
-        text-align: center;
+    0%,
+    100% {
+        transform: translateX(0);
     }
 
-    @keyframes bufferPulse {}
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
 }
 
-.menu-input-buffer.invalid {
-    background: #dc3545;
-    animation: bufferShake 0.3s;
-}
+@keyframes bufferPulse {}
 
 @keyframes bufferShake {
-
     0%,
     100% {
         transform: translateX(0);
@@ -827,12 +856,6 @@ body {
     100% {
         opacity: 0;
     }
-}
-
-.menu-input-buffer.ready {
-    background: #ffc107;
-    color: #000;
-}
 
 /* Suporte para alto contraste */
 @media (prefers-contrast: high) {
