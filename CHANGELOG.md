@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.1 (2026-03-02)
+
+### Added
+- pacote de áudio modular em `v3/static/js/audio/` com separação por contexto, buffer, registry, playback, controles, estado e ponto de entrada
+- fila de envio de comandos no WebSocket com rate limiting aleatório para macros e preservação de ordem
+- modelo de fase de sessão no front-end (`UNAUTHENTICATED`, `AUTH_IN_PROGRESS`, `IN_GAME`) com transições idempotentes
+- detecção de entrada em jogo por padrões de linha recebida para transição automática de fase
+- tratamento centralizado e idempotente de desconexão para limpeza de fila de saída e reset de menu
+- normalização case-insensitive de caminhos de áudio no interpretador de `send(...)`, retornando capitalização canônica do arquivo
+
 ## v3 (2026-02-14)
 
 ### Added
