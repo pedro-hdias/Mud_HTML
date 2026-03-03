@@ -245,6 +245,7 @@ function updateConnectionState(state) {
                 inputDisabled: true
             });
             UIHelpers.setMainContentVisibility(false);
+            UIHelpers.clearOutput();
             transitionToPhase("UNAUTHENTICATED", "disconnected");
             if (!StateStore.isReconnecting() && StateStore.isSessionInitialized()) {
                 StateManager.clearSessionState();

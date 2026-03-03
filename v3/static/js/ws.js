@@ -408,9 +408,14 @@ function handleSoundMessage(payload) {
 }
 
 function handleStateMessage(payload) {
-    if (payload.value === "DISCONNECTED") {
+    const previousState = StateStore.getConnectionState();
+
+    // Only call handleDisconnect if transitioning FROM a connected state TO disconnected
+    // Don't call it for status updates or initial state reports
+    if (payload.value === "DISCONNECTED" && previousState !== "DISCONNECTED" && StateStore.isSessionInitialized()) {
         handleDisconnect("state_message_disconnected");
     }
+
     updateConnectionState(payload.value);
 }
 

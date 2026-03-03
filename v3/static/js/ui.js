@@ -471,6 +471,24 @@ const UIHelpers = {
             reconnectStatus.classList.remove(CONFIG.CLASSES.show);
             reconnectStatus.classList.add('hidden');
         }
+    },
+
+    /**
+     * Limpa o histórico de mensagens e acessibilidade
+     * Chamado ao desconectar para limpar state do cliente
+     */
+    clearOutput() {
+        const output = getElement(CONFIG.SELECTORS.output);
+        const announcer = getElement(CONFIG.SELECTORS.screenReaderAnnouncer);
+
+        if (output) {
+            output.innerHTML = "";
+            uiLogger.log("Output cleared");
+        }
+        if (announcer) {
+            announcer.innerHTML = "";
+            uiLogger.log("Screen reader announcer cleared");
+        }
     }
 };
 
