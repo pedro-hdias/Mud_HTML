@@ -42,13 +42,13 @@ const CONFIG = {
     SELECTORS: {
         // Elementos principais
         output: "#output",
+        screenReaderAnnouncer: "#screen-reader-announcer",
         input: "#input",
 
         // Botões
         btnLogin: "#btnLogin",
         btnDisconnect: "#btnDisconnect",
         btnClear: "#btnClear",
-        btnSoundToggle: "#btnSoundToggle",
         btnSend: "#btnSend",
         btnCancelLogin: "#btnCancelLogin",
         btnCancelReconnect: "#btnCancelReconnect",
@@ -100,19 +100,21 @@ const CONFIG = {
     },
 
     // Output
-    OUTPUT_MAX_LINES: 2000,
+    OUTPUT_MAX_LINES: 25,              // Linhas visíveis no buffer
+    OUTPUT_COMPACT_THRESHOLD: 50,      // Compactar quando exceder este número
     OUTPUT_HISTORY_MAX_LINES: 2000,
 
     // Fila de comandos pendentes (quando desconectado temporariamente)
     COMMAND_QUEUE_MAX: 10,
 
-    // Menu interativo
-    MENU_TIMEOUT_MS: 2500,
-    MENU_BUFFER_TIMEOUT_MS: 800,  // Timeout entre dígitos do buffer (ms)
-    MENU_MAX_OPTION_DIGITS: 3,   // Máximo de dígitos para opção (ex: 999)
+    // Menu: tempo de espera para digitação de opções multi-dígito (ms)
+    MENU_INPUT_DELAY_MS: 800,
 
     // Cookie config
-    COOKIE_EXPIRY_DAYS: 30
+    COOKIE_EXPIRY_DAYS: 30,
+
+    // Debug: força o botão de histórico a aparecer (para testes)
+    DEBUG_FORCE_HISTORY_BUTTON: false
 };
 
 // Função helper para obter elemento do DOM com cache

@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sessões Ativas - Debug</title>
+    <title>Active Sessions - Debug</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -118,44 +118,93 @@
             font-size: 12px;
             margin: 10px 0;
         }
+
+        /* Accessibility */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #4CAF50;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 0 0 4px 0;
+            z-index: 10000;
+            transition: top 0.3s;
+        }
+
+        .skip-link:focus {
+            top: 0;
+            outline: 3px solid #ffc107;
+            outline-offset: 2px;
+        }
     </style>
 </head>
 
 <body>
-    <h1>🎮 Sessões MUD Ativas</h1>
+    <a href="#sessionsTable" class="skip-link">Skip to sessions table</a>
+    <a href="#controls" class="skip-link">Skip to controls</a>
 
-    <div class="summary">
-        <div class="stat-card">
-            <h3>Total de Sessões</h3>
-            <div class="number" id="totalSessions">-</div>
-        </div>
-        <div class="stat-card">
-            <h3>Clientes Conectados</h3>
-            <div class="number" id="totalClients">-</div>
-        </div>
-    </div>
+    <header role="banner">
+        <h1>🎮 Active MUD Sessions</h1>
+    </header>
 
-    <button onclick="refreshData()">🔄 Atualizar</button>
-    <button onclick="toggleAutoRefresh()">⏱️ Auto-refresh (<span id="autoRefreshState">OFF</span>)</button>
+    <main role="main">
+        <section aria-labelledby="summaryHeading">
+            <h2 id="summaryHeading" class="visually-hidden">Sessions Summary</h2>
+            <div class="summary">
+                <div class="stat-card">
+                    <h3>Total Sessions</h3>
+                    <div class="number" id="totalSessions" aria-live="polite">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Connected Clients</h3>
+                    <div class="number" id="totalClients" aria-live="polite">-</div>
+                </div>
+            </div>
+        </section>
 
-    <div class="last-update" id="lastUpdate">-</div>
+        <nav id="controls" aria-label="Session controls">
+            <button onclick="refreshData()" aria-label="Refresh session data">🔄 Refresh</button>
+            <button onclick="toggleAutoRefresh()" aria-label="Toggle auto-refresh">⏱️ Auto-refresh (<span
+                    id="autoRefreshState">OFF</span>)</button>
+        </nav>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Session ID</th>
-                <th>Estado</th>
-                <th>Clientes</th>
-                <th>Última Atividade</th>
-                <th>Histórico (bytes)</th>
-            </tr>
-        </thead>
-        <tbody id="sessionsTable">
-            <tr>
-                <td colspan="5" style="text-align: center;">Carregando...</td>
-            </tr>
-        </tbody>
-    </table>
+        <div class="last-update" id="lastUpdate" role="status" aria-live="polite">-</div>
+
+        <section aria-labelledby="sessionsTableHeading">
+            <h2 id="sessionsTableHeading" class="visually-hidden">Sessions Details</h2>
+            <table role="table" aria-label="Active sessions information">
+                <thead>
+                    <tr>
+                        <th scope="col">Session ID</th>
+                        <th scope="col">State</th>
+                        <th scope="col">Clients</th>
+                        <th scope="col">Last Activity</th>
+                        <th scope="col">History (bytes)</th>
+                    </tr>
+                </thead>
+                <tbody id="sessionsTable" role="rowgroup">
+                    <tr>
+                        <td colspan="5" style="text-align: center;">Loading...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+    </main>
 
     <script>
         let autoRefreshInterval = null;
@@ -165,14 +214,14 @@
                 const response = await fetch('/api/sessions/status');
                 const data = await response.json();
 
-                // Atualiza summary
+                // Updates summary
                 document.getElementById('totalSessions').textContent = data.total_sessions;
                 document.getElementById('totalClients').textContent = data.total_clients;
 
-                // Atualiza tabela
+                // Updates table
                 const tbody = document.getElementById('sessionsTable');
                 if (data.sessions.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Nenhuma sessão ativa</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No active sessions</td></tr>';
                 } else {
                     tbody.innerHTML = data.sessions.map(session => {
                         const lastActivity = new Date(session.last_activity);
@@ -190,24 +239,24 @@
                     }).join('');
                 }
 
-                // Atualiza timestamp
+                // Updates timestamp
                 document.getElementById('lastUpdate').textContent =
-                    `Última atualização: ${new Date().toLocaleTimeString()}`;
+                    `Last update: ${new Date().toLocaleTimeString()}`;
 
             } catch (error) {
-                console.error('Erro ao buscar dados:', error);
+                console.error('Error fetching data:', error);
                 document.getElementById('sessionsTable').innerHTML =
-                    '<tr><td colspan="5" style="text-align: center; color: red;">Erro ao carregar dados</td></tr>';
+                    '<tr><td colspan="5" style="text-align: center; color: red;">Error loading data</td></tr>';
             }
         }
 
         function getTimeAgo(date) {
             const seconds = Math.floor((new Date() - date) / 1000);
 
-            if (seconds < 60) return `${seconds}s atrás`;
-            if (seconds < 3600) return `${Math.floor(seconds / 60)}m atrás`;
-            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h atrás`;
-            return `${Math.floor(seconds / 86400)}d atrás`;
+            if (seconds < 60) return `${seconds}s ago`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            return `${Math.floor(seconds / 86400)}d ago`;
         }
 
         function toggleAutoRefresh() {
@@ -222,7 +271,7 @@
             }
         }
 
-        // Carrega dados ao abrir
+        // Load data on open
         refreshData();
     </script>
 </body>

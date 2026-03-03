@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en-US">
 
 <head>
     <meta charset="UTF-8">
@@ -192,54 +192,94 @@
             font-size: 11px;
             color: #888;
         }
+
+        /* Accessibility */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #0e639c;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 0 0 4px 0;
+            z-index: 10000;
+            transition: top 0.3s;
+        }
+
+        .skip-link:focus {
+            top: 0;
+            outline: 3px solid #dcdcaa;
+            outline-offset: 2px;
+        }
     </style>
 </head>
 
 <body>
-    <header>
-        <h1>📋 Log Viewer - Tempo Real</h1>
-        <div class="controls">
+    <a href="#logContainer" class="skip-link">Skip to logs</a>
+    <a href="#filters" class="skip-link">Skip to filters</a>
+
+    <header role="banner">
+        <h1>📋 Real-Time Log Viewer</h1>
+        <nav class="controls" aria-label="Main controls">
             <div class="status">
                 <div class="status-indicator" id="statusIndicator"></div>
-                <span id="statusText">Desconectado</span>
+                <span id="statusText">Disconnected</span>
             </div>
-            <button id="pauseBtn">⏸️ Pausar</button>
-            <button id="clearBtn" class="danger">🗑️ Limpar</button>
-            <a href="/" style="text-decoration: none;">
-                <button>🏠 Voltar</button>
+            <button id="pauseBtn" aria-label="Pause log reception" aria-pressed="false">⏸️ Pause</button>
+            <button id="clearBtn" class="danger" aria-label="Clear all logs">🗑️ Clear</button>
+            <a href="/" style="text-decoration: none;" aria-label="Back to main page">
+                <button>🏠 Back</button>
             </a>
-        </div>
+            </div>
     </header>
 
-    <div class="filters">
+    <aside id="filters" class="filters" role="search" aria-labelledby="filtersHeading">
+        <h2 id="filtersHeading" class="visually-hidden">Log Filters</h2>
         <div class="filter-group">
-            <label>Buscar:</label>
-            <input type="text" id="searchInput" placeholder="Digite para filtrar logs...">
+            <label for="searchInput">Search:</label>
+            <input type="text" id="searchInput" placeholder="Type to filter logs..." aria-label="Search text in logs">
         </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterDebug" checked>
-            <label for="filterDebug">DEBUG</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterInfo" checked>
-            <label for="filterInfo">INFO</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterWarning" checked>
-            <label for="filterWarning">WARNING</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterError" checked>
-            <label for="filterError">ERROR</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterCritical" checked>
-            <label for="filterCritical">CRITICAL</label>
-        </div>
-        <div class="stats" id="stats">Total: 0 linhas</div>
-    </div>
+        <fieldset class="filter-group" style="border: none; padding: 0; margin: 0;">
+            <legend class="visually-hidden">Log levels</legend>
+            <div class="filter-group">
+                <input type="checkbox" id="filterDebug" checked aria-label="Show DEBUG logs">
+                <label for="filterDebug">DEBUG</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterInfo" checked aria-label="Show INFO logs">
+                <label for="filterInfo">INFO</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterWarning" checked aria-label="Show WARNING logs">
+                <label for="filterWarning">WARNING</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterError" checked aria-label="Show ERROR logs">
+                <label for="filterError">ERROR</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterCritical" checked aria-label="Show CRITICAL logs">
+                <label for="filterCritical">CRITICAL</label>
+            </div>
+        </fieldset>
+        <div class="stats" id="stats" role="status" aria-live="polite">Total: 0 lines</div>
+    </aside>
 
-    <div id="logContainer"></div>
+    <main id="logContainer" role="main" aria-live="polite" aria-atomic="false" aria-label="Logs area"></main>
 
     <script>
         const logContainer = document.getElementById('logContainer');
@@ -313,7 +353,7 @@
         }
 
         function updateStats() {
-            statsEl.textContent = `Total: ${totalLines} linhas`;
+            statsEl.textContent = `Total: ${totalLines} lines`;
         }
 
         function connectToStream() {
@@ -325,14 +365,14 @@
 
             eventSource.onopen = () => {
                 statusIndicator.className = 'status-indicator connected';
-                statusText.textContent = 'Conectado';
+                statusText.textContent = 'Connected';
             };
 
             eventSource.onerror = () => {
                 statusIndicator.className = 'status-indicator disconnected';
-                statusText.textContent = 'Desconectado';
+                statusText.textContent = 'Disconnected';
 
-                // Tenta reconectar após 3 segundos
+                // Try to reconnect after 3 seconds
                 setTimeout(() => {
                     if (eventSource.readyState === EventSource.CLOSED) {
                         connectToStream();
@@ -366,10 +406,10 @@
             updateStats();
         }
 
-        // Controles
+        // Controls
         pauseBtn.addEventListener('click', () => {
             isPaused = !isPaused;
-            pauseBtn.textContent = isPaused ? '▶️ Continuar' : '⏸️ Pausar';
+            pauseBtn.textContent = isPaused ? '▶️ Resume' : '⏸️ Pause';
 
             if (!isPaused && pendingLogs.length > 0) {
                 pendingLogs.forEach(line => addLogLine(line));
@@ -378,30 +418,30 @@
         });
 
         clearBtn.addEventListener('click', () => {
-            if (confirm('Limpar todos os logs exibidos?')) {
+            if (confirm('Clear all displayed logs?')) {
                 logContainer.innerHTML = '';
                 totalLines = 0;
                 updateStats();
             }
         });
 
-        // Filtros
+        // Filters
         Object.values(filters).forEach(checkbox => {
             checkbox.addEventListener('change', refreshDisplay);
         });
 
         searchInput.addEventListener('input', refreshDisplay);
 
-        // Detecta se usuário está fazendo scroll manual
+        // Detects if user is manually scrolling
         logContainer.addEventListener('scroll', () => {
             const isNearBottom = logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight < 100;
             autoScroll = isNearBottom;
         });
 
-        // Inicia conexão
+        // Start connection
         connectToStream();
 
-        // Cleanup ao fechar
+        // Cleanup when closing
         window.addEventListener('beforeunload', () => {
             if (eventSource) {
                 eventSource.close();

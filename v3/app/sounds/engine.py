@@ -5,12 +5,15 @@ Motor de sons do Prometheus - orquestrador principal.
 import re
 import random
 from typing import Dict, List, Any
+from pathlib import Path
 
 from .models import TriggerRule, SoundEvent
 from .parser import load_rules, clear_rules_cache
 from .matcher import compile_rule_matcher, normalize_line
 from .interpreter import SendInterpreter
+from .registry import get_registry
 from .state import _Settings, _ConfigTable
+from ..config import AUDIO_DEBUG_DETAILS
 from ..logger import get_logger
 
 logger = get_logger(__name__)
@@ -32,15 +35,26 @@ class PrometheusSoundEngine:
         self._settings = _Settings()
         self._config_table = _ConfigTable(self._settings)
         self._last_line = ""
+        self._registry = get_registry()
+        
+        # 💾 CACHE: Armazenar matchers compilados para evitar recompilação
+        self._matcher_cache = {}
+        self._compilation_times = {}
         
         logger.info(f"Motor de sons inicializado com {len(self._rules)} regras, seed={seed}")
         
-        # Pré-compila todos os regras
+        # Pré-compila todos as regras e armazena em cache
         compiled_count = 0
         for rule in self._rules:
-            compile_rule_matcher(rule)
-            if rule.compiled:
+            matcher = compile_rule_matcher(rule)
+            if matcher:
+                self._matcher_cache[id(rule)] = matcher
                 compiled_count += 1
+        
+        logger.info(f"✓ Cache de matchers compilados: {compiled_count}/{len(self._rules)} regras")
+        
+        # Diagnóstico: Contar triggers por categoria
+        self._log_trigger_diagnostics()
 
     def process_line(self, line: str) -> List[Dict[str, Any]]:
         """
@@ -59,16 +73,25 @@ class PrometheusSoundEngine:
         events: List[Dict[str, Any]] = []
         matched_rules = 0
         
+        # Normalize once at the beginning
+        normalized = normalize_line(line)
+        
         for rule_idx, rule in enumerate(self._rules):
             if not rule.enabled or not rule.match:
                 continue
             
-            matcher = compile_rule_matcher(rule)
-            if not matcher:
-                continue
+            # 💾 CACHE: Usar matcher compilado em cache em vez de recompilar
+            rule_id = id(rule)
+            matcher = self._matcher_cache.get(rule_id)
             
-            # Normalize before match
-            normalized = normalize_line(line)
+            if not matcher:
+                # Fallback: compilar sob demanda se não em cache
+                matcher = compile_rule_matcher(rule)
+                if matcher:
+                    self._matcher_cache[rule_id] = matcher
+                else:
+                    continue
+            
             matches = list(matcher.finditer(normalized))
             
             if not matches:
@@ -81,6 +104,12 @@ class PrometheusSoundEngine:
                 captures = [match.group(0)] + list(match.groups())
                 rule_events = self._execute_rule(rule, captures)
                 events.extend(rule_events)
+
+            # Comportamento compatível com MUSHclient:
+            # por padrão, para no primeiro trigger que casar, a menos que
+            # keep_evaluating esteja explicitamente habilitado.
+            if not rule.keep_evaluating:
+                break
         
         logger.info(f"Linha processada: {matched_rules} regras combinadas, {len(events)} eventos gerados")
         return events
@@ -125,12 +154,114 @@ class PrometheusSoundEngine:
             "settings": self._settings,
             "config": self._config_table,
         }
+    
+    def _log_trigger_diagnostics(self) -> None:
+        """Registra diagnóstico de triggers carregados."""
+        # Contar triggers por categoria de som
+        categories = {
+            "ambient": 0,
+            "combat": 0,
+            "social": 0,
+            "channel": 0,
+            "other": 0,
+        }
+        
+        disabled = 0
+        
+        for rule in self._rules:
+            if not rule.enabled:
+                disabled += 1
+                continue
+            
+            send_text = rule.send_text or ""
+            
+            if "General/Rooms" in send_text or "Ambient" in rule.match:
+                categories["ambient"] += 1
+            elif "Combat" in send_text or "Ground/Fight" in send_text:
+                categories["combat"] += 1
+            elif "Socials" in send_text:
+                categories["social"] += 1
+            elif "Channels" in send_text:
+                categories["channel"] += 1
+            else:
+                categories["other"] += 1
+        
+        # Log detalhado
+        logger.info(f"Triggers por categoria:")
+        logger.info(f"  • Ambiente (Rooms): {categories['ambient']}")
+        logger.info(f"  • Combate: {categories['combat']}")
+        logger.info(f"  • Sociais: {categories['social']}")
+        logger.info(f"  • Canais: {categories['channel']}")
+        logger.info(f"  • Outros: {categories['other']}")
+        logger.info(f"  • Desativados: {disabled}")
+        
+        # Log de registry
+        registry_stats = self._registry.get_stats()
+        logger.info(f"Sound Registry: {registry_stats['total_files']} arquivos de áudio encontrados")
+        if AUDIO_DEBUG_DETAILS:
+            logger.info(f"Sound Registry (debug) por categoria: {registry_stats['categories']}")
 
     def clear_cache(self) -> None:
         """Limpa cache de regras compiladas."""
         for rule in self._rules:
             rule.compiled = None
         clear_rules_cache()
+        self._matcher_cache.clear()
+        logger.info("✓ Cache de matchers limpo")
+    
+    # ========== MÉTRICAS DE PERFORMANCE ==========
+    
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """
+        Retorna estatísticas de performance do motor.
+        
+        Returns:
+            Dict com metrics de cache, regras, etc
+        """
+        import time
+        
+        cache_size = len(self._matcher_cache)
+        total_rules = len(self._rules)
+        compilation_ratio = (cache_size / total_rules * 100) if total_rules > 0 else 0
+        
+        return {
+            "total_rules": total_rules,
+            "cached_matchers": cache_size,
+            "cache_coverage": f"{compilation_ratio:.1f}%",
+            "last_line_processed": self._last_line[:50] if self._last_line else None,
+            "registry_stats": self._registry.get_stats(),
+            "timestamp": time.time(),
+        }
+    
+    def get_diagnostic_report(self) -> str:
+        """Retorna relatório completo de diagnóstico do motor."""
+        stats = self.get_performance_stats()
+        
+        lines = [
+            "=" * 70,
+            "PROMETHEUS SOUND ENGINE - DIAGNOSTIC REPORT",
+            "=" * 70,
+            f"Regras carregadas: {stats['total_rules']}",
+            f"Matchers em cache: {stats['cached_matchers']}/{stats['total_rules']} ({stats['cache_coverage']})",
+            f"Arquivos de som: {stats['registry_stats']['total_files']}",
+            f"Categorias de som: {stats['registry_stats']['total_categories']}",
+            "",
+            "Cache de Matchers Compilados:",
+            f"  • Hits: Matchers reutilizados em cada linha processada",
+            f"  • Cobre: {stats['cache_coverage']} das regras",
+            "",
+            "Categorias de Som:",
+        ]
+        
+        for cat, count in sorted(stats['registry_stats']['categories'].items()):
+            lines.append(f"  • {cat}: {count} sons")
+        
+        lines.extend([
+            "",
+            "=" * 70,
+        ])
+        
+        return "\n".join(lines)
 
 
 def get_sound_engine(seed: int = None, settings: Dict[str, Any] = None) -> PrometheusSoundEngine:
