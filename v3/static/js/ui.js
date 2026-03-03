@@ -73,6 +73,7 @@ function hasAnsiCodes(text) {
 
 const UIHelpers = {
     _scrollRafId: null,
+    _trimTimeoutId: null,
 
     /**
      * Agenda scroll para o fim do output usando rAF.
@@ -87,36 +88,173 @@ const UIHelpers = {
         });
     },
 
-    trimOutputLines(output, maxLines) {
-        if (!output) return;
-        const totalLines = output.children.length;
-        if (totalLines <= maxLines) return;
+    /**
+     * Agenda trimagem com debounce para evitar múltiplas operações DOM
+     * e reanúncios desnecessários do leitor de tela
+     */
+    /**
+     * Gerencia lazy-loader de histórico
+     * Garante que existe um elemento para carregar histórico
+     */
+    ensureHistoryLoader(output) {
+        if (!output) {
+            uiLogger.error("ensureHistoryLoader called with no output element");
+            return;
+        }
 
-        const toRemove = totalLines - maxLines;
+        // Verifica se já existe um loader
+        let loader = output.querySelector('.history-loader');
+        if (loader) {
+            uiLogger.log("History loader already exists in DOM");
+            return loader;
+        }
 
-        // Range API: remoção em lote causa um único reflow
-        // em vez de N reflows com removeChild() em loop
-        const range = document.createRange();
-        range.setStartBefore(output.firstChild);
-        range.setEndAfter(output.children[toRemove - 1]);
-        range.deleteContents();
+        uiLogger.log("Creating new history loader element");
+
+        // Cria novo loader
+        loader = document.createElement('details');
+        loader.className = 'history-loader';
+        loader.dataset.fromLineIndex = '25';
+        loader.dataset.hasMore = 'true';
+
+        const summary = document.createElement('summary');
+        summary.innerHTML = '<span class="loader-text">📖 Load older messages (0 linhas)</span>';
+        summary.setAttribute('tabindex', '0');
+        summary.setAttribute('role', 'button');
+        summary.setAttribute('aria-label', 'Carregar mensagens antigas');
+        loader.appendChild(summary);
+
+        const content = document.createElement('div');
+        content.className = 'history-loader-content';
+        loader.appendChild(content);
+
+        output.insertBefore(loader, output.firstChild);
+
+        uiLogger.log("✅ History loader created and inserted:", {
+            loader,
+            parent: loader.parentElement,
+            display: window.getComputedStyle(loader).display,
+            visibility: window.getComputedStyle(loader).visibility
+        });
+
+        return loader;
     },
-    appendSystemMessage(message, color) {
+
+    /**
+     * Marca que estamos carregando histórico
+     */
+    setHistoryLoading(output, isLoading) {
+        const loader = this.ensureHistoryLoader(output);
+        if (!loader) return;
+
+        const content = loader.querySelector('.history-loader-content');
+        if (!content) return;
+
+        if (isLoading) {
+            const spinner = content.querySelector('.loader-spinner');
+            if (!spinner) {
+                const sp = document.createElement('div');
+                sp.className = 'loader-spinner';
+                sp.textContent = 'Loading...';
+                content.appendChild(sp);
+            }
+        }
+    },
+
+    /**
+     * Adiciona histórico ao loader
+     */
+    appendHistoryToLoader(output, historyContent) {
+        const loader = this.ensureHistoryLoader(output);
+        if (!loader) return;
+
+        const content = loader.querySelector('.history-loader-content');
+        if (!content) {
+            uiLogger.error("History loader content div not found");
+            return;
+        }
+
+        // Remove spinner
+        const spinner = content.querySelector('.loader-spinner');
+        if (spinner) spinner.remove();
+
+        // Divide conteúdo em linhas
+        const lines = historyContent.split('\n').filter(l => l.length > 0);
+
+        uiLogger.log(`Adding ${lines.length} lines to history loader`);
+
+        lines.forEach(line => {
+            const lineEl = document.createElement('div');
+            lineEl.className = CONFIG.CLASSES.outputLine + ' ' + CONFIG.CLASSES.history;
+            lineEl.textContent = line;
+            lineEl.setAttribute('tabindex', '0');
+            lineEl.setAttribute('role', 'article');
+            lineEl.setAttribute('aria-label', `História: ${line.substring(0, 50)}`);
+            content.insertBefore(lineEl, content.firstChild);
+        });
+
+        // Atualiza contador
+        const textSpan = loader.querySelector('.loader-text');
+        if (textSpan) {
+            const count = content.querySelectorAll('.' + CONFIG.CLASSES.outputLine).length;
+            textSpan.textContent = `📖 Load older messages (${count} linhas)`;
+            uiLogger.log(`Updated history loader counter: ${count} lines`);
+        }
+    },
+
+    /**
+     * Atualiza estado do loader
+     */
+    updateHistoryLoaderState(output, hasMore, fromLineIndex) {
+        const loader = this.ensureHistoryLoader(output);
+        if (!loader) return;
+
+        loader.dataset.hasMore = hasMore ? 'true' : 'false';
+        loader.dataset.fromLineIndex = fromLineIndex;
+
+        if (!hasMore) {
+            const summary = loader.querySelector('summary');
+            if (summary) {
+                summary.textContent = '🎯 All history loaded';
+            }
+            loader.setAttribute('disabled', 'disabled');
+        }
+    },
+    addSystemMessage(message, color = null) {
         const output = getElement(CONFIG.SELECTORS.output);
+        const announcer = getElement(CONFIG.SELECTORS.screenReaderAnnouncer);
         if (!output) return;
 
         const sysMsg = document.createElement("div");
         sysMsg.className = CONFIG.CLASSES.systemMessage;
         if (color) sysMsg.style.color = color;
         sysMsg.textContent = message;
+
+        // Add to visible output
         output.appendChild(sysMsg);
 
-        this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
+        // Add to screen reader announcer (no limit, keeps all)
+        if (announcer) {
+            const announceLine = document.createElement("div");
+            announceLine.textContent = message;
+            announcer.appendChild(announceLine);
+        }
+
+        // Trim output to max lines
+        if (output.children.length > CONFIG.OUTPUT_MAX_LINES) {
+            const toRemove = output.children.length - CONFIG.OUTPUT_MAX_LINES;
+            for (let i = 0; i < toRemove; i++) {
+                if (output.firstChild) {
+                    output.removeChild(output.firstChild);
+                }
+            }
+        }
 
         this._scheduleScrollToBottom(output);
     },
     appendOutputLine(text, options = {}) {
         const output = getElement(CONFIG.SELECTORS.output);
+        const announcer = getElement(CONFIG.SELECTORS.screenReaderAnnouncer);
         if (!output) return;
 
         const lineEl = document.createElement("div");
@@ -128,7 +266,7 @@ const UIHelpers = {
         }
         lineEl.className = classNames.join(" ");
 
-        // Parsear ANSI se presente, senão textContent (mais rápido)
+        // Parse ANSI if present, otherwise textContent (faster)
         if (hasAnsiCodes(text)) {
             const fragment = parseAnsiToFragment(text);
             if (fragment) {
@@ -140,17 +278,32 @@ const UIHelpers = {
             lineEl.textContent = text;
         }
 
+        // Add to visible output
         output.appendChild(lineEl);
 
-        this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
+        // If it's a new line (not history), add to screen reader announcer (no limit)
+        if (!options.isHistory && announcer) {
+            const announceLine = document.createElement("div");
+            announceLine.textContent = text;
+            announcer.appendChild(announceLine);
+        }
+
+        if (output.children.length > CONFIG.OUTPUT_MAX_LINES) {
+            const toRemove = output.children.length - CONFIG.OUTPUT_MAX_LINES;
+            for (let i = 0; i < toRemove; i++) {
+                if (output.firstChild) {
+                    output.removeChild(output.firstChild);
+                }
+            }
+        }
+
         this._scheduleScrollToBottom(output);
     },
-    appendHistoryBlock(content) {
+    appendHistoryBlock(content, options = {}) {
         const output = getElement(CONFIG.SELECTORS.output);
         if (!output) return;
 
-        const historyContainer = document.createElement("div");
-        historyContainer.className = CONFIG.CLASSES.historyBlock;
+        const isRecent = options.isRecent || false;
 
         const lines = content.split(/\r?\n/);
         const maxHistoryLines = CONFIG.OUTPUT_HISTORY_MAX_LINES || CONFIG.OUTPUT_MAX_LINES;
@@ -161,18 +314,29 @@ const UIHelpers = {
                 const lineEl = document.createElement("div");
                 lineEl.className = `${CONFIG.CLASSES.outputLine} ${CONFIG.CLASSES.history}`;
                 lineEl.textContent = line;
-                historyContainer.appendChild(lineEl);
+                lineEl.setAttribute('tabindex', '0');
+                lineEl.setAttribute('role', 'article');
+                lineEl.setAttribute('aria-label', `História: ${line.substring(0, 50)}`);
+                output.appendChild(lineEl);
             }
         });
 
-        output.appendChild(historyContainer);
-        this.trimOutputLines(output, CONFIG.OUTPUT_MAX_LINES);
+        // Trim output to max lines
+        if (output.children.length > CONFIG.OUTPUT_MAX_LINES) {
+            const toRemove = output.children.length - CONFIG.OUTPUT_MAX_LINES;
+            for (let i = 0; i < toRemove; i++) {
+                if (output.firstChild) {
+                    output.removeChild(output.firstChild);
+                }
+            }
+        }
+
         this._scheduleScrollToBottom(output);
     },
 
     setButtonsState({
-        loginDisabled,
-        disconnectDisabled,
+        loginVisible,
+        disconnectVisible,
         sendDisabled,
         inputDisabled
     }) {
@@ -181,10 +345,25 @@ const UIHelpers = {
         const btnSend = getElement(CONFIG.SELECTORS.btnSend);
         const input = getElement(CONFIG.SELECTORS.input);
 
-        if (typeof loginDisabled === "boolean" && btnLogin) btnLogin.disabled = loginDisabled;
-        if (typeof disconnectDisabled === "boolean" && btnDisconnect) btnDisconnect.disabled = disconnectDisabled;
+        if (typeof loginVisible === "boolean" && btnLogin) btnLogin.hidden = !loginVisible;
+        if (typeof disconnectVisible === "boolean" && btnDisconnect) btnDisconnect.hidden = !disconnectVisible;
         if (typeof sendDisabled === "boolean" && btnSend) btnSend.disabled = sendDisabled;
         if (typeof inputDisabled === "boolean" && input) input.disabled = inputDisabled;
+    },
+
+    setMainContentVisibility(visible) {
+        const mainContent = document.getElementById("mainContent");
+        const inputArea = document.getElementById("inputArea");
+        const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
+
+        if (mainContent) mainContent.hidden = !visible;
+        if (inputArea) inputArea.hidden = !visible;
+        if (reconnectStatus && !visible) reconnectStatus.hidden = true;
+    },
+
+    setMenuContainerVisibility(visible) {
+        const menuContainer = document.getElementById("menuContainer");
+        if (menuContainer) menuContainer.hidden = !visible;
     },
 
     setStatusIndicator({ text, stateClass }) {
@@ -240,6 +419,35 @@ const UIHelpers = {
         reconnectStatus.hidden = !visible;
     }
 };
+
+// ===== DEBUG UTILITIES =====
+// Função de debug global para testar o botão de histórico
+window.debugForceHistoryButton = function () {
+    const output = getElement(CONFIG.SELECTORS.output);
+    if (!output) {
+        console.error("❌ Output element not found");
+        return;
+    }
+
+    console.log("🔧 Forcing history button to appear...");
+    const loader = UIHelpers.ensureHistoryLoader(output);
+    UIHelpers.updateHistoryLoaderState(output, true, 0);
+
+    console.log("✅ History button created:", {
+        element: loader,
+        inDOM: document.contains(loader),
+        display: window.getComputedStyle(loader).display,
+        visibility: window.getComputedStyle(loader).visibility,
+        position: loader.getBoundingClientRect()
+    });
+
+    return loader;
+};
+
+// ===== END DEBUG =====
+
+// Exporta UIHelpers para o escopo global (usado por ws.js e outros)
+window.UIHelpers = UIHelpers;
 
 /**
  * Mostra o modal de confirmação

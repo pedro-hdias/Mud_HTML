@@ -25,6 +25,7 @@
     }
 
     let isMenuOpen = false;
+    let lastInterceptorAvailable = null;
 
     /**
      * Abre/fecha o menu de áudio
@@ -56,9 +57,17 @@
             // SoundInterceptor não está disponível - desabilitar checkbox
             checkAutoPlay.disabled = true;
             checkAutoPlay.checked = false;
-            audioLogger.log("SoundInterceptor not available - checkbox disabled");
+            if (lastInterceptorAvailable !== false) {
+                audioLogger.log("SoundInterceptor not available - checkbox disabled");
+            }
+            lastInterceptorAvailable = false;
             return;
         }
+
+        if (lastInterceptorAvailable !== true) {
+            audioLogger.log("SoundInterceptor available - checkbox enabled");
+        }
+        lastInterceptorAvailable = true;
 
         // Habilitar checkbox se SoundInterceptor está disponível
         checkAutoPlay.disabled = false;

@@ -27,6 +27,7 @@ const EventManager = {
             this.bindLoginFormEvents();
             this.bindModalEvents();
             this.bindKeyboardEvents();
+            this.bindOutputEvents();
             this.initialized = true;
             eventsLogger.log("Event manager initialized");
         } catch (e) {
@@ -256,6 +257,50 @@ const EventManager = {
         }, { signal: this._abortController.signal });
     },
 
+    bindOutputEvents() {
+        const output = getElement(CONFIG.SELECTORS.output);
+        if (!output) return;
+
+        // Event delegado para cliques no history-loader
+        output.addEventListener("click", (e) => {
+            const loader = e.target.closest('details.history-loader');
+            if (loader) {
+                // Se o details foi aberto, requisitar mais histórico
+                if (loader.open) {
+                    eventsLogger.log("History loader expanded - requesting older messages");
+                    this.requestOlderHistory(loader);
+                }
+            }
+        }, { signal: this._abortController.signal });
+    },
+
+    /**
+     * Requisita histórico mais antigo do servidor
+     */
+    requestOlderHistory(loaderElement) {
+        if (!loaderElement) return;
+
+        const fromLineIndex = parseInt(loaderElement.dataset.fromLineIndex || "0");
+        const hasMore = loaderElement.dataset.hasMore === 'true';
+
+        if (!hasMore) {
+            eventsLogger.log("No more history available");
+            return;
+        }
+
+        // Requisita um bloco de histórico anterior
+        if (typeof WebSocketManager !== "undefined" && WebSocketManager.sendMessage) {
+            eventsLogger.log(`Requesting history from line ${fromLineIndex}`);
+            WebSocketManager.sendMessage("request_history", {
+                from_line_index: fromLineIndex,
+                num_lines: 25
+            });
+
+            // Mostra loading
+            UIHelpers.setHistoryLoading(getElement(CONFIG.SELECTORS.output), true);
+        }
+    },
+
     // Handlers
     handleLoginClick() {
         eventsLogger.log("Login button clicked - initiating connection");
@@ -314,7 +359,14 @@ const EventManager = {
 
     handleClearClick() {
         const output = getElement(CONFIG.SELECTORS.output);
-        if (output) output.innerHTML = "";
+        const announcer = getElement(CONFIG.SELECTORS.screenReaderAnnouncer);
+
+        if (output) {
+            output.innerHTML = "";
+        }
+        if (announcer) {
+            announcer.innerHTML = "";
+        }
     },
 
 
@@ -350,7 +402,7 @@ const EventManager = {
                 sendCommand(lastCommand);
                 input.focus();
                 UIHelpers.flashInput();
-                UIHelpers.appendSystemMessage(`[resend] ${lastCommand}`, "#888");
+                UIHelpers.addSystemMessage(`[resend] ${lastCommand}`, "#888");
                 return;
             }
         }

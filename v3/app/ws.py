@@ -86,9 +86,14 @@ async def websocket_endpoint(ws: WebSocket):
                 log_state_read(session.state, f"send_state_to_client_{public_id}")
                 await ws.send_json(make_message("state", {"value": session.state.value}))
                 
-                # Envia o histórico se existir
+                # Envia o histórico se existir (apenas as últimas 25 linhas)
                 if session.history:
-                    await ws.send_json(make_message("history", {"content": session.history}))
+                    recent_history = session.get_recent_history(num_lines=25)
+                    await ws.send_json(make_message("history", {
+                        "content": recent_history,
+                        "is_recent": True,
+                        "has_more_history": len(session.history.split('\n')) > 25
+                    }))
                 
                 # Confirma inicialização com ownership token
                 await ws.send_json(make_message("init_ok", {
@@ -142,6 +147,13 @@ async def websocket_endpoint(ws: WebSocket):
                 
                 elif msg_type == "command":
                     await handle_command(session, ws, public_id, payload)
+                
+                elif msg_type == "request_history":
+                    # Cliente requisita histórico antigo (lazy loading)
+                    from_line_index = payload.get("from_line_index", 0)
+                    num_lines = payload.get("num_lines", 25)
+                    history_slice = session.get_history_slice(from_line_index, num_lines)
+                    await ws.send_json(make_message("history_slice", history_slice))
             
             except ValueError:
                 # Mensagem não é JSON, trata como comando direto (backward compatibility)

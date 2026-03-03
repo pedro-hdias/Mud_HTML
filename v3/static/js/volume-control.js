@@ -29,6 +29,10 @@
         slider.value = vol;
         valueDisplay.textContent = vol + "%";
 
+        // Atualiza atributos ARIA para acessibilidade
+        slider.setAttribute("aria-valuenow", vol);
+        slider.setAttribute("aria-label", `Master volume ${vol}%`);
+
         // Atualiza sistema de áudio
         if (typeof _MudAudio !== 'undefined' && _MudAudio.volume) {
             _MudAudio.volume(vol);

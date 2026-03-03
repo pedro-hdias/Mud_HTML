@@ -175,10 +175,10 @@ const StateStore = {
 function transitionToPhase(nextPhase, reason) {
     const current = StateStore.getSessionPhase();
     if (current === nextPhase) {
-        stateLogger.debug("Phase already", nextPhase, "("+reason+")");
+        stateLogger.debug("Phase already", nextPhase, "(" + reason + ")");
         return;
     }
-    stateLogger.log("Session phase:", current, "->", nextPhase, "("+reason+")");
+    stateLogger.log("Session phase:", current, "->", nextPhase, "(" + reason + ")");
     StateStore.setSessionPhase(nextPhase);
 
     if (nextPhase === "AUTH_IN_PROGRESS" || nextPhase === "IN_GAME") {
@@ -239,11 +239,12 @@ function updateConnectionState(state) {
             UIHelpers.setStatusIndicator({ text: "Desconectado" });
             UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
-                loginDisabled: false,
-                disconnectDisabled: true,
+                loginVisible: true,
+                disconnectVisible: false,
                 sendDisabled: true,
                 inputDisabled: true
             });
+            UIHelpers.setMainContentVisibility(false);
             transitionToPhase("UNAUTHENTICATED", "disconnected");
             if (!StateStore.isReconnecting() && StateStore.isSessionInitialized()) {
                 StateManager.clearSessionState();
@@ -257,11 +258,12 @@ function updateConnectionState(state) {
             });
             UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
-                loginDisabled: true,
-                disconnectDisabled: true,
+                loginVisible: false,
+                disconnectVisible: false,
                 sendDisabled: true,
                 inputDisabled: true
             });
+            UIHelpers.setMainContentVisibility(true);
             break;
 
         case "RECONNECTING":
@@ -271,11 +273,12 @@ function updateConnectionState(state) {
             });
             UIHelpers.setReconnectControls({ visible: true });
             UIHelpers.setButtonsState({
-                loginDisabled: true,
-                disconnectDisabled: true,
+                loginVisible: false,
+                disconnectVisible: false,
                 sendDisabled: true,
                 inputDisabled: true
             });
+            UIHelpers.setMainContentVisibility(true);
             break;
 
         case "CONNECTED":
@@ -285,11 +288,12 @@ function updateConnectionState(state) {
             });
             UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
-                loginDisabled: true,
-                disconnectDisabled: false,
+                loginVisible: false,
+                disconnectVisible: true,
                 sendDisabled: false,
                 inputDisabled: false
             });
+            UIHelpers.setMainContentVisibility(true);
             const input = getElement(CONFIG.SELECTORS.input);
             if (input) input.focus();
 
@@ -321,11 +325,12 @@ function updateConnectionState(state) {
             });
             UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
-                loginDisabled: true,
-                disconnectDisabled: false,
+                loginVisible: false,
+                disconnectVisible: true,
                 sendDisabled: true,
                 inputDisabled: true
             });
+            UIHelpers.setMainContentVisibility(true);
             break;
     }
 }
