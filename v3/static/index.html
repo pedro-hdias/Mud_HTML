@@ -24,7 +24,7 @@
 
         <nav aria-label="Connection controls">
             <button id="btnLogin" aria-label="Connect to server">Login</button>
-            <button id="btnDisconnect" aria-label="Disconnect from server" hidden>Disconnect</button>
+            <button id="btnDisconnect" aria-label="Disconnect from server" class="hidden" hidden>Disconnect</button>
         </nav>
 
         <div class="controls-divider"></div>
@@ -46,7 +46,7 @@
                 <span id="volumeValue" aria-live="polite">100%</span>
             </div>
 
-            <div id="audioMenu" class="audio-menu-popup" role="menu" aria-label="Audio controls menu" hidden>
+            <div id="audioMenu" class="audio-menu-popup hidden" role="menu" aria-label="Audio controls menu" hidden>
                 <div class="audio-menu-header" role="heading" aria-level="3">Audio Controls</div>
 
                 <div class="audio-menu-item" role="menuitemcheckbox" aria-checked="false"
@@ -84,7 +84,7 @@
             <span id="statusText" role="status" aria-live="polite">Disconnected</span>
         </section>
 
-        <div id="reconnectStatus" role="status" aria-live="assertive" hidden>
+        <div id="reconnectStatus" role="status" aria-live="assertive" class="hidden" hidden>
             <span>Reconnecting...</span>
             <button id="btnCancelReconnect" type="button" aria-label="Cancel reconnection attempt">Cancel
                 attempt</button>
@@ -92,7 +92,7 @@
     </header>
 
     <!-- Main Content -->
-    <main id="mainContent" role="main" hidden>
+    <main id="mainContent" role="main" class="hidden" hidden>
         <!-- Output Area -->
         <section id="outputSection" aria-labelledby="outputHeading">
             <h2 id="outputHeading" class="visually-hidden">Game Output</h2>
@@ -101,12 +101,12 @@
 
         <!-- Menu Container (separate from output for better accessibility) -->
         <aside id="menuContainer" role="region" aria-live="polite" aria-label="Interactive menu region"
-            aria-atomic="true" hidden>
+            aria-atomic="true" class="hidden" hidden>
         </aside>
     </main>
 
     <!-- Input Area -->
-    <footer id="inputArea" role="contentinfo" aria-labelledby="inputHeading" hidden>
+    <footer id="inputArea" role="contentinfo" aria-labelledby="inputHeading" class="hidden" hidden>
         <h2 id="inputHeading" class="visually-hidden">Command Input Area</h2>
         <label for="input" class="visually-hidden">Enter a command</label>
         <input id="input" type="text" placeholder="Enter a command (multiple: use ;)"

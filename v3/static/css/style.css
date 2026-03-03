@@ -242,6 +242,52 @@ body {
     font-weight: 600;
 }
 
+/* Generic visibility classes for cross-browser compatibility (iOS fix) */
+.hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+.show {
+    display: revert !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+/* Specific display types for common elements */
+button.show,
+a.show,
+span.show,
+div:not(#output):not(#inputArea).show {
+    display: inline-block !important;
+}
+
+#mainContent.show,
+#inputArea.show,
+#menuContainer.show {
+    display: flex !important;
+}
+
+/* Hide states for common elements (iOS fix) */
+#mainContent.hidden,
+#inputArea.hidden,
+#menuContainer.hidden,
+#btnLogin.hidden,
+#btnDisconnect.hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+#btnLogin.show,
+#btnDisconnect.show {
+    display: inline-block !important;
+}
+
 /* Audio Menu Popup */
 .audio-menu-popup {
     position: absolute;
@@ -255,8 +301,32 @@ body {
     min-width: 240px;
     z-index: 1000;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.2s ease-in-out;
 }
 
+/* Show state for audio menu - iOS compatible */
+.audio-menu-popup.show {
+    display: flex !important;
+    max-height: 500px;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Hide state - iOS compatible */
+.audio-menu-popup.hidden {
+    display: none !important;
+    max-height: 0;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* Backward compatibility with [hidden] attribute */
 .audio-menu-popup[hidden] {
     display: none;
 }
@@ -361,6 +431,20 @@ body {
 #reconnectStatus {
     color: var(--color-warning);
     order: 19;
+}
+
+#reconnectStatus.show {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
+
+#reconnectStatus.hidden {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
 }
 
 #reconnectStatus[hidden] {

@@ -345,8 +345,24 @@ const UIHelpers = {
         const btnSend = getElement(CONFIG.SELECTORS.btnSend);
         const input = getElement(CONFIG.SELECTORS.input);
 
-        if (typeof loginVisible === "boolean" && btnLogin) btnLogin.hidden = !loginVisible;
-        if (typeof disconnectVisible === "boolean" && btnDisconnect) btnDisconnect.hidden = !disconnectVisible;
+        if (typeof loginVisible === "boolean" && btnLogin) {
+            if (loginVisible) {
+                btnLogin.classList.add(CONFIG.CLASSES.show);
+                btnLogin.classList.remove('hidden');
+            } else {
+                btnLogin.classList.remove(CONFIG.CLASSES.show);
+                btnLogin.classList.add('hidden');
+            }
+        }
+        if (typeof disconnectVisible === "boolean" && btnDisconnect) {
+            if (disconnectVisible) {
+                btnDisconnect.classList.add(CONFIG.CLASSES.show);
+                btnDisconnect.classList.remove('hidden');
+            } else {
+                btnDisconnect.classList.remove(CONFIG.CLASSES.show);
+                btnDisconnect.classList.add('hidden');
+            }
+        }
         if (typeof sendDisabled === "boolean" && btnSend) btnSend.disabled = sendDisabled;
         if (typeof inputDisabled === "boolean" && input) input.disabled = inputDisabled;
     },
@@ -356,14 +372,46 @@ const UIHelpers = {
         const inputArea = document.getElementById("inputArea");
         const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
 
-        if (mainContent) mainContent.hidden = !visible;
-        if (inputArea) inputArea.hidden = !visible;
-        if (reconnectStatus && !visible) reconnectStatus.hidden = true;
+        if (mainContent) {
+            if (visible) {
+                mainContent.classList.add(CONFIG.CLASSES.show);
+                mainContent.classList.remove('hidden');
+            } else {
+                mainContent.classList.remove(CONFIG.CLASSES.show);
+                mainContent.classList.add('hidden');
+            }
+        }
+        if (inputArea) {
+            if (visible) {
+                inputArea.classList.add(CONFIG.CLASSES.show);
+                inputArea.classList.remove('hidden');
+            } else {
+                inputArea.classList.remove(CONFIG.CLASSES.show);
+                inputArea.classList.add('hidden');
+            }
+        }
+        if (reconnectStatus) {
+            if (!visible) {
+                reconnectStatus.classList.add('hidden');
+                reconnectStatus.classList.remove(CONFIG.CLASSES.show);
+            } else {
+                reconnectStatus.classList.remove('hidden');
+                reconnectStatus.classList.add(CONFIG.CLASSES.show);
+            }
+        }
     },
 
     setMenuContainerVisibility(visible) {
         const menuContainer = document.getElementById("menuContainer");
-        if (menuContainer) menuContainer.hidden = !visible;
+        if (menuContainer) {
+            if (visible) {
+                menuContainer.classList.add(CONFIG.CLASSES.show);
+                menuContainer.classList.remove('hidden');
+            } else {
+                menuContainer.classList.remove(CONFIG.CLASSES.show);
+                menuContainer.classList.add('hidden');
+            }
+        }
     },
 
     setStatusIndicator({ text, stateClass }) {
@@ -416,7 +464,13 @@ const UIHelpers = {
         const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
         if (!reconnectStatus) return;
 
-        reconnectStatus.hidden = !visible;
+        if (visible) {
+            reconnectStatus.classList.add(CONFIG.CLASSES.show);
+            reconnectStatus.classList.remove('hidden');
+        } else {
+            reconnectStatus.classList.remove(CONFIG.CLASSES.show);
+            reconnectStatus.classList.add('hidden');
+        }
     }
 };
 

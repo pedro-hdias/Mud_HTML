@@ -32,7 +32,16 @@
      */
     function toggleAudioMenu() {
         isMenuOpen = !isMenuOpen;
-        audioMenu.hidden = !isMenuOpen;
+
+        // Usar classList em vez de atributo hidden para melhor compatibilidade iOS
+        if (isMenuOpen) {
+            audioMenu.classList.add(CONFIG.CLASSES.show);
+            audioMenu.classList.remove('hidden');
+        } else {
+            audioMenu.classList.remove(CONFIG.CLASSES.show);
+            audioMenu.classList.add('hidden');
+        }
+
         btnAudioMenu.setAttribute("aria-expanded", isMenuOpen.toString());
 
         if (isMenuOpen) {
@@ -45,7 +54,8 @@
      */
     function closeAudioMenu() {
         isMenuOpen = false;
-        audioMenu.hidden = true;
+        audioMenu.classList.remove(CONFIG.CLASSES.show);
+        audioMenu.classList.add('hidden');
         btnAudioMenu.setAttribute("aria-expanded", "false");
     }
 
