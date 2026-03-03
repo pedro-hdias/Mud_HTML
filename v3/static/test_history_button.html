@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste History Loader Button</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <div id="output" style="padding: 20px; min-height: 200px; background: #1e1e1e;">
+        <details class="history-loader">
+            <summary tabindex="0" role="button" aria-label="Carregar mensagens antigas">
+                <span class="loader-text">📖 Load older messages (0 linhas)</span>
+            </summary>
+            <div class="history-loader-content">
+                <div class="output-line history">Linha de histórico 1</div>
+                <div class="output-line history">Linha de histórico 2</div>
+                <div class="output-line history">Linha de histórico 3</div>
+            </div>
+        </details>
+
+        <div class="output-line">Linha normal do output</div>
+        <div class="output-line">Outra linha normal</div>
+    </div>
+
+    <script>
+        console.log('Teste de History Loader');
+        const loader = document.querySelector('.history-loader');
+        console.log('Loader encontrado:', loader);
+        console.log('Computed style:', window.getComputedStyle(loader));
+        console.log('Display:', window.getComputedStyle(loader).display);
+        console.log('Visibility:', window.getComputedStyle(loader).visibility);
+    </script>
+</body>
+
+</html>

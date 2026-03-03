@@ -162,7 +162,7 @@ function scheduleReconnect() {
         StateStore.setAllowReconnect(false);
         StateStore.setIsReconnecting(false);
         updateConnectionState("DISCONNECTED");
-        UIHelpers.appendSystemMessage("[SYSTEM] Failed to reconnect after multiple attempts. Click 'Login' to try again.", "red");
+        UIHelpers.addSystemMessage("[SYSTEM] Failed to reconnect after multiple attempts. Click 'Login' to try again.", "red");
         return;
     }
 
@@ -244,6 +244,9 @@ function handleWebSocketMessage(event) {
             case "history":
                 handleHistoryMessage(msg.payload || {});
                 break;
+            case "history_slice":
+                handleHistorySliceMessage(msg.payload || {});
+                break;
             case "line":
                 handleLineMessage(msg.payload || {});
                 break;
@@ -318,7 +321,7 @@ function handleWebSocketClose(event) {
         scheduleReconnect();
     }
 
-    if (sysMessage) UIHelpers.appendSystemMessage(sysMessage, sysColor);
+    if (sysMessage) UIHelpers.addSystemMessage(sysMessage, sysColor);
 }
 
 // ===== Message Handlers =====
@@ -355,7 +358,7 @@ function handleInitOkMessage(payload) {
         wsLogger.log("New session created");
     } else if (payload.status === "recovered") {
         wsLogger.log("Session recovered successfully");
-        UIHelpers.appendSystemMessage("[SYSTEM] Session recovered successfully!", "#4CAF50");
+        UIHelpers.addSystemMessage("[SYSTEM] Session recovered successfully!", "#4CAF50");
     }
 
     // Se há credenciais salvas, estamos reconectando
@@ -385,7 +388,7 @@ function handleSessionInvalidMessage(payload) {
         message: payload.message
     });
 
-    UIHelpers.appendSystemMessage(`[SYSTEM] ${payload.message}`, "orange");
+    UIHelpers.addSystemMessage(`[SYSTEM] ${payload.message}`, "orange");
 
     // O WebSocket será fechado pelo servidor com código 4003
     // O handler onclose cuidará da limpeza e reconexão
@@ -413,14 +416,69 @@ function handleStateMessage(payload) {
 
 function handleErrorMessage(payload) {
     wsLogger.error("Server error", payload.message);
-    UIHelpers.appendSystemMessage("[ERROR] " + payload.message, "red");
+    UIHelpers.addSystemMessage("[ERROR] " + payload.message, "red");
 }
 
 function handleHistoryMessage(payload) {
-    UIHelpers.appendHistoryBlock(payload.content || "");
+    const isRecent = payload.is_recent || false;
+    const hasMoreHistory = payload.has_more_history || false || CONFIG.DEBUG_FORCE_HISTORY_BUTTON;
+
+    wsLogger.log(`📜 History received:`, {
+        isRecent,
+        hasMoreHistory,
+        contentLength: (payload.content || '').length,
+        contentLines: (payload.content || '').split('\n').length
+    });
+
+    if (isRecent) {
+        // Histórico recente: renderizar normalmente sem compactar
+        UIHelpers.appendHistoryBlock(payload.content || "", { isRecent: true });
+
+        // Se houver mais histórico, mostrar loader sob demanda
+        if (hasMoreHistory) {
+            wsLogger.log("✅ Creating history loader (hasMoreHistory === true)");
+            const output = getElement(CONFIG.SELECTORS.output);
+            if (output) {
+                const loader = UIHelpers.ensureHistoryLoader(output);
+                wsLogger.log("📦 History loader element:", loader);
+                wsLogger.log("📍 Loader is in DOM:", document.contains(loader));
+                wsLogger.log("👁️ Loader visibility:", window.getComputedStyle(loader).display);
+                wsLogger.log("📏 Loader position:", loader.getBoundingClientRect());
+                wsLogger.log("🔍 Output scroll:", { scrollTop: output.scrollTop, scrollHeight: output.scrollHeight, clientHeight: output.clientHeight });
+                UIHelpers.updateHistoryLoaderState(output, true, 25);
+            } else {
+                wsLogger.error("❌ Output element not found!");
+            }
+        } else {
+            wsLogger.log("⚠️ No more history available (hasMoreHistory === false), skipping loader");
+        }
+    } else {
+        // Histórico sob demanda: adicionar ao loader
+        const output = getElement(CONFIG.SELECTORS.output);
+        if (output) {
+            UIHelpers.appendHistoryToLoader(output, payload.content || "");
+            UIHelpers.updateHistoryLoaderState(output, payload.has_more_history || false, payload.from_line_index || 0);
+        }
+    }
 
     if (payload.content && StateStore.isReconnecting()) {
         wsLogger.log("History received during reconnection - session active");
+    }
+}
+
+function handleHistorySliceMessage(payload) {
+    wsLogger.log(`📜 History slice received:`, {
+        contentLength: (payload.content || '').length,
+        contentLines: (payload.content || '').split('\n').filter(l => l).length,
+        hasMore: payload.has_more,
+        fromLineIndex: payload.from_line_index
+    });
+
+    // Histórico sob demanda é sempre processado como não-recente
+    const output = getElement(CONFIG.SELECTORS.output);
+    if (output) {
+        UIHelpers.appendHistoryToLoader(output, payload.content || "");
+        UIHelpers.updateHistoryLoaderState(output, payload.has_more || false, payload.from_line_index || 0);
     }
 }
 
@@ -492,7 +550,7 @@ function detectSessionPhaseFromLine(line) {
 }
 
 function handleSystemMessage(payload) {
-    UIHelpers.appendSystemMessage("[SYSTEM] " + payload.message);
+    UIHelpers.addSystemMessage("[SYSTEM] " + payload.message);
 }
 
 // ===== Funkcionalidade: Dividir comandos por `;` =====
@@ -517,11 +575,11 @@ function sendCommand(commandText) {
         if (StateStore.isReconnecting() && pendingCommandQueue.length < CONFIG.COMMAND_QUEUE_MAX) {
             pendingCommandQueue.push(commandText);
             wsLogger.log("Command queued during reconnect", commandText, `(${pendingCommandQueue.length} in queue)`);
-            UIHelpers.appendSystemMessage(`[SYSTEM] Command queued (reconnecting...) [${pendingCommandQueue.length}/${CONFIG.COMMAND_QUEUE_MAX}]`, "#888");
+            UIHelpers.addSystemMessage(`[SYSTEM] Command queued (reconnecting...) [${pendingCommandQueue.length}/${CONFIG.COMMAND_QUEUE_MAX}]`, "#888");
             return;
         }
         wsLogger.error("Cannot send command - WebSocket not connected");
-        UIHelpers.appendSystemMessage("[SYSTEM] Not connected - reconnecting...", "orange");
+        UIHelpers.addSystemMessage("[SYSTEM] Not connected - reconnecting...", "orange");
         return;
     }
 
@@ -561,7 +619,7 @@ function flushPendingCommands() {
     }
 
     if (queued.length > 0) {
-        UIHelpers.appendSystemMessage(`[SYSTEM] ${queued.length} queued command(s) sent.`, "#4CAF50");
+        UIHelpers.addSystemMessage(`[SYSTEM] ${queued.length} queued command(s) sent.`, "#4CAF50");
     }
 }
 
@@ -607,6 +665,6 @@ function cancelReconnectAttempt() {
         ws.close();
     }
 
-    UIHelpers.appendSystemMessage("[SYSTEM] Reconnection cancelled.", "orange");
+    UIHelpers.addSystemMessage("[SYSTEM] Reconnection cancelled.", "orange");
 }
 

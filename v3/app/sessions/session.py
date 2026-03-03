@@ -66,6 +66,68 @@ class MudSession:
         """Verifica se a sessão tem clientes conectados"""
         return len(self.websocket_clients) > 0
     
+    def get_recent_history(self, num_lines: int = 25) -> str:
+        """
+        Retorna as últimas N linhas do histórico
+        Usado ao conectar para enviar apenas histórico recente
+        """
+        if not self.history:
+            return ""
+        
+        lines = self.history.split('\n')
+        # Retorna o máximo de linhas pedidas, ou menos se o histórico for menor
+        start_idx = max(0, len(lines) - num_lines)
+        return '\n'.join(lines[start_idx:])
+    
+    def get_history_slice(self, from_line_index: int, num_lines: int = 25) -> dict:
+        """
+        Retorna um slice de histórico anterior ao from_line_index
+        Usado para carregar histórico antigo (lazy loading)
+        
+        Args:
+            from_line_index: índice (do fim) a partir do qual carregar histórico anterior
+            num_lines: número de linhas a carregar
+        
+        Returns:
+            dict com 'content' (linhas), 'total_lines' (total no histórico) e 'has_more' (se há mais antes)
+        """
+        if not self.history:
+            return {
+                "content": "",
+                "total_lines": 0,
+                "has_more": False,
+                "from_line_index": 0,
+                "returned_lines": 0
+            }
+        
+        lines = self.history.split('\n')
+        total = len(lines)
+        
+        # from_line_index é contado do final: 0 = últimas linhas, 1 = penúltima, etc
+        # Queremos carregar histórico ANTERIOR a esse ponto
+        start_idx = max(0, total - from_line_index - num_lines)
+        end_idx = max(0, total - from_line_index)
+        
+        if start_idx >= end_idx:
+            return {
+                "content": "",
+                "total_lines": total,
+                "has_more": False,
+                "from_line_index": from_line_index,
+                "returned_lines": 0
+            }
+        
+        slice_lines = lines[start_idx:end_idx]
+        has_more = start_idx > 0
+        
+        return {
+            "content": '\n'.join(slice_lines),
+            "total_lines": total,
+            "has_more": has_more,
+            "from_line_index": from_line_index,
+            "returned_lines": len(slice_lines)
+        }
+    
     async def broadcast_state(self, state: ConnectionState):
         """Notifica todos os clientes desta sessão sobre mudança de estado"""
         previous_state = self.state

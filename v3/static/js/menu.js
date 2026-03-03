@@ -369,8 +369,17 @@ const MenuManager = {
         }
 
         const menuContainer = this.createMenuContainer(items);
-        output.appendChild(menuContainer);
-        output.scrollTop = output.scrollHeight;
+
+        // Renderiza no container separado de menus (melhor para accessibility)
+        const menuRegion = document.getElementById("menuContainer");
+        if (menuRegion) {
+            menuRegion.innerHTML = "";
+            menuRegion.appendChild(menuContainer);
+            UIHelpers.setMenuContainerVisibility(true);
+        } else {
+            // Fallback: renderiza no output se menuContainer não existir
+            output.appendChild(menuContainer);
+        }
 
         this.currentMenu = {
             container: menuContainer,
@@ -402,6 +411,13 @@ const MenuManager = {
                 btn.disabled = true;
                 btn.setAttribute("tabindex", "-1");
             });
+
+            // Remove menu do container separado
+            const menuRegion = document.getElementById("menuContainer");
+            if (menuRegion && this.currentMenu.container.parentNode === menuRegion) {
+                menuRegion.innerHTML = "";
+                UIHelpers.setMenuContainerVisibility(false);
+            }
 
             this.currentMenu = null;
         }

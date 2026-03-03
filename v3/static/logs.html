@@ -192,54 +192,94 @@
             font-size: 11px;
             color: #888;
         }
+
+        /* Accessibility */
+        .visually-hidden {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #0e639c;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 0 0 4px 0;
+            z-index: 10000;
+            transition: top 0.3s;
+        }
+
+        .skip-link:focus {
+            top: 0;
+            outline: 3px solid #dcdcaa;
+            outline-offset: 2px;
+        }
     </style>
 </head>
 
 <body>
-    <header>
+    <a href="#logContainer" class="skip-link">Skip to logs</a>
+    <a href="#filters" class="skip-link">Skip to filters</a>
+
+    <header role="banner">
         <h1>📋 Real-Time Log Viewer</h1>
-        <div class="controls">
+        <nav class="controls" aria-label="Main controls">
             <div class="status">
                 <div class="status-indicator" id="statusIndicator"></div>
                 <span id="statusText">Disconnected</span>
             </div>
-            <button id="pauseBtn">⏸️ Pause</button>
-            <button id="clearBtn" class="danger">🗑️ Clear</button>
-            <a href="/" style="text-decoration: none;">
+            <button id="pauseBtn" aria-label="Pause log reception" aria-pressed="false">⏸️ Pause</button>
+            <button id="clearBtn" class="danger" aria-label="Clear all logs">🗑️ Clear</button>
+            <a href="/" style="text-decoration: none;" aria-label="Back to main page">
                 <button>🏠 Back</button>
             </a>
-        </div>
+            </div>
     </header>
 
-    <div class="filters">
+    <aside id="filters" class="filters" role="search" aria-labelledby="filtersHeading">
+        <h2 id="filtersHeading" class="visually-hidden">Log Filters</h2>
         <div class="filter-group">
-            <label>Search:</label>
-            <input type="text" id="searchInput" placeholder="Type to filter logs...">
+            <label for="searchInput">Search:</label>
+            <input type="text" id="searchInput" placeholder="Type to filter logs..." aria-label="Search text in logs">
         </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterDebug" checked>
-            <label for="filterDebug">DEBUG</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterInfo" checked>
-            <label for="filterInfo">INFO</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterWarning" checked>
-            <label for="filterWarning">WARNING</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterError" checked>
-            <label for="filterError">ERROR</label>
-        </div>
-        <div class="filter-group">
-            <input type="checkbox" id="filterCritical" checked>
-            <label for="filterCritical">CRITICAL</label>
-        </div>
-        <div class="stats" id="stats">Total: 0 lines</div>
-    </div>
+        <fieldset class="filter-group" style="border: none; padding: 0; margin: 0;">
+            <legend class="visually-hidden">Log levels</legend>
+            <div class="filter-group">
+                <input type="checkbox" id="filterDebug" checked aria-label="Show DEBUG logs">
+                <label for="filterDebug">DEBUG</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterInfo" checked aria-label="Show INFO logs">
+                <label for="filterInfo">INFO</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterWarning" checked aria-label="Show WARNING logs">
+                <label for="filterWarning">WARNING</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterError" checked aria-label="Show ERROR logs">
+                <label for="filterError">ERROR</label>
+            </div>
+            <div class="filter-group">
+                <input type="checkbox" id="filterCritical" checked aria-label="Show CRITICAL logs">
+                <label for="filterCritical">CRITICAL</label>
+            </div>
+        </fieldset>
+        <div class="stats" id="stats" role="status" aria-live="polite">Total: 0 lines</div>
+    </aside>
 
-    <div id="logContainer"></div>
+    <main id="logContainer" role="main" aria-live="polite" aria-atomic="false" aria-label="Logs area"></main>
 
     <script>
         const logContainer = document.getElementById('logContainer');
