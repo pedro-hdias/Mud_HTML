@@ -4,7 +4,7 @@ Motor de sons do Prometheus - orquestrador principal.
 
 import re
 import random
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 from pathlib import Path
 
 from .models import TriggerRule, SoundEvent
@@ -36,6 +36,8 @@ class PrometheusSoundEngine:
         self._config_table = _ConfigTable(self._settings)
         self._last_line = ""
         self._registry = get_registry()
+        self._last_should_omit = False  # Flag de omissão da última linha processada
+        self._last_rewritten_text: Optional[str] = None  # Texto reescrito da última linha
         
         # 💾 CACHE: Armazenar matchers compilados para evitar recompilação
         self._matcher_cache = {}
@@ -70,6 +72,8 @@ class PrometheusSoundEngine:
             return []
         
         self._last_line = line
+        self._last_should_omit = False  # Reset flags para essa linha
+        self._last_rewritten_text = None
         events: List[Dict[str, Any]] = []
         matched_rules = 0
         
@@ -99,25 +103,48 @@ class PrometheusSoundEngine:
             
             matched_rules += 1
             
+            # Se essa regra tem omit_from_output, marca para omissão
+            if rule.omit_from_output:
+                self._last_should_omit = True
+            
             # Processa cada match
             for match_idx, match in enumerate(matches):
                 captures = [match.group(0)] + list(match.groups())
-                rule_events = self._execute_rule(rule, captures)
+                rule_events, rewritten_text = self._execute_rule(rule, captures)
                 events.extend(rule_events)
+                
+                # Se há texto reescrito, armazena
+                if rewritten_text:
+                    self._last_rewritten_text = rewritten_text
 
             # Comportamento compatível com MUSHclient:
             # por padrão, para no primeiro trigger que casar, a menos que
             # keep_evaluating esteja explicitamente habilitado.
             if not rule.keep_evaluating:
                 break
+            if not rule.keep_evaluating:
+                break
         
         logger.info(f"Linha processada: {matched_rules} regras combinadas, {len(events)} eventos gerados")
         return events
 
-    def _execute_rule(self, rule: TriggerRule, captures: List[str]) -> List[Dict[str, Any]]:
-        """Executa send block de uma regra."""
+    def get_last_omit_status(self) -> bool:
+        """Retorna se a última linha processada deve ser omitida do output."""
+        return self._last_should_omit
+    
+    def get_last_rewritten_text(self) -> Optional[str]:
+        """Retorna o texto reescrito da última linha processada (via Note())."""
+        return self._last_rewritten_text
+
+    def _execute_rule(self, rule: TriggerRule, captures: List[str]) -> tuple:
+        """
+        Executa send block de uma regra.
+        
+        Returns:
+            Tupla (events, rewritten_text)
+        """
         if not rule.send_text:
-            return []
+            return [], None
         
         variables = self._init_variables(captures)
         
@@ -130,9 +157,10 @@ class PrometheusSoundEngine:
         )
         
         sound_events = interpreter.run(rule.send_text)
+        rewritten_text = interpreter.get_rewritten_text()
         
         # Converte para dicts para serialização JSON
-        return [
+        events = [
             {
                 "action": evt.get("action"),
                 "channel": evt.get("channel"),
@@ -145,6 +173,8 @@ class PrometheusSoundEngine:
             }
             for evt in sound_events
         ]
+        
+        return events, rewritten_text
 
     def _init_variables(self, captures: List[str]) -> Dict[str, Any]:
         """Inicializa variáveis para SendInterpreter."""

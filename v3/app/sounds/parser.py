@@ -87,6 +87,8 @@ def _build_rule(raw: Dict[str, Any]) -> TriggerRule:
     sequence = int(attrs.get("sequence") or _extract_attr(body_lines, "sequence") or 0)
     send_to = attrs.get("send_to") or _extract_attr(body_lines, "send_to")
     send_text = _extract_send_text(body_lines)
+    omit_from_output = (attrs.get("omit_from_output") or _extract_attr(body_lines, "omit_from_output") or "").lower() == "y"
+    omit_from_log = (attrs.get("omit_from_log") or _extract_attr(body_lines, "omit_from_log") or "").lower() == "y"
     
     rule = TriggerRule(
         enabled=enabled,
@@ -98,9 +100,10 @@ def _build_rule(raw: Dict[str, Any]) -> TriggerRule:
         send_text=send_text,
         send_to=send_to,
         compiled=None,
+        omit_from_output=omit_from_output,
+        omit_from_log=omit_from_log,
     )
     
-
     return rule
 
 
@@ -115,17 +118,19 @@ def _extract_attr(lines: List[str], name: str) -> Optional[str]:
 
 
 def _extract_send_text(lines: List[str]) -> str:
-    """Extrai bloco <send>...</send>."""
-    send_lines: List[str] = []
-    in_send = False
-    for line in lines:
-        if "<send>" in line:
-            in_send = True
-        if in_send:
-            send_lines.append(line)
-        if "</send>" in line:
-            in_send = False
-    return "\n".join(send_lines)
+    """Extrai bloco <send>...</send> limpando tags XML."""
+    text = "\n".join(lines)
+    
+    # Find send block
+    if "<send>" not in text or "</send>" not in text:
+        return ""
+    
+    # Extract content between <send> and </send>
+    start_idx = text.find("<send>") + len("<send>")
+    end_idx = text.find("</send>")
+    
+    content = text[start_idx:end_idx].strip()
+    return content
 
 
 def clear_rules_cache() -> None:

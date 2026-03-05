@@ -32,3 +32,5 @@ class TriggerRule:
     send_text: str
     send_to: Optional[str]
     compiled: Optional[re.Pattern] = None
+    omit_from_output: bool = False  # Se True, linha não é exibida ao usuário
+    omit_from_log: bool = False     # Se True, linha não é adicionada ao histórico
