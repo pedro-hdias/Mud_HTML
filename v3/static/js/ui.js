@@ -349,18 +349,22 @@ const UIHelpers = {
             if (loginVisible) {
                 btnLogin.classList.add(CONFIG.CLASSES.show);
                 btnLogin.classList.remove('hidden');
+                btnLogin.removeAttribute('hidden');
             } else {
                 btnLogin.classList.remove(CONFIG.CLASSES.show);
                 btnLogin.classList.add('hidden');
+                btnLogin.setAttribute('hidden', '');
             }
         }
         if (typeof disconnectVisible === "boolean" && btnDisconnect) {
             if (disconnectVisible) {
                 btnDisconnect.classList.add(CONFIG.CLASSES.show);
                 btnDisconnect.classList.remove('hidden');
+                btnDisconnect.removeAttribute('hidden');
             } else {
                 btnDisconnect.classList.remove(CONFIG.CLASSES.show);
                 btnDisconnect.classList.add('hidden');
+                btnDisconnect.setAttribute('hidden', '');
             }
         }
         if (typeof sendDisabled === "boolean" && btnSend) btnSend.disabled = sendDisabled;
@@ -370,33 +374,27 @@ const UIHelpers = {
     setMainContentVisibility(visible) {
         const mainContent = document.getElementById("mainContent");
         const inputArea = document.getElementById("inputArea");
-        const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
 
         if (mainContent) {
             if (visible) {
                 mainContent.classList.add(CONFIG.CLASSES.show);
                 mainContent.classList.remove('hidden');
+                mainContent.removeAttribute('hidden');
             } else {
                 mainContent.classList.remove(CONFIG.CLASSES.show);
                 mainContent.classList.add('hidden');
+                mainContent.setAttribute('hidden', '');
             }
         }
         if (inputArea) {
             if (visible) {
                 inputArea.classList.add(CONFIG.CLASSES.show);
                 inputArea.classList.remove('hidden');
+                inputArea.removeAttribute('hidden');
             } else {
                 inputArea.classList.remove(CONFIG.CLASSES.show);
                 inputArea.classList.add('hidden');
-            }
-        }
-        if (reconnectStatus) {
-            if (!visible) {
-                reconnectStatus.classList.add('hidden');
-                reconnectStatus.classList.remove(CONFIG.CLASSES.show);
-            } else {
-                reconnectStatus.classList.remove('hidden');
-                reconnectStatus.classList.add(CONFIG.CLASSES.show);
+                inputArea.setAttribute('hidden', '');
             }
         }
     },
@@ -407,9 +405,11 @@ const UIHelpers = {
             if (visible) {
                 menuContainer.classList.add(CONFIG.CLASSES.show);
                 menuContainer.classList.remove('hidden');
+                menuContainer.removeAttribute('hidden');
             } else {
                 menuContainer.classList.remove(CONFIG.CLASSES.show);
                 menuContainer.classList.add('hidden');
+                menuContainer.setAttribute('hidden', '');
             }
         }
     },
@@ -467,9 +467,11 @@ const UIHelpers = {
         if (visible) {
             reconnectStatus.classList.add(CONFIG.CLASSES.show);
             reconnectStatus.classList.remove('hidden');
+            reconnectStatus.removeAttribute('hidden');
         } else {
             reconnectStatus.classList.remove(CONFIG.CLASSES.show);
             reconnectStatus.classList.add('hidden');
+            reconnectStatus.setAttribute('hidden', '');
         }
     },
 
