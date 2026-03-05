@@ -358,15 +358,7 @@ const EventManager = {
     },
 
     handleClearClick() {
-        const output = getElement(CONFIG.SELECTORS.output);
-        const announcer = getElement(CONFIG.SELECTORS.screenReaderAnnouncer);
-
-        if (output) {
-            output.innerHTML = "";
-        }
-        if (announcer) {
-            announcer.innerHTML = "";
-        }
+        UIHelpers.clearOutput();
     },
 
 

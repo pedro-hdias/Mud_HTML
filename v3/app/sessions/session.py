@@ -282,11 +282,24 @@ class MudSession:
                         if not output_line:
                             continue
 
+                        # Processa sons e rastreia omissão/reescrita
                         sound_events = self.sound_engine.process_line(output_line)
                         if sound_events:
                             await self.broadcast_message(make_message("sound", {"events": sound_events}))
 
-                        await self.broadcast_message(make_message("line", {"content": output_line}))
+                        # Respeita flag omit_from_output
+                        should_omit = self.sound_engine.get_last_omit_status()
+                        rewritten_text = self.sound_engine.get_last_rewritten_text()
+                        
+                        if should_omit:
+                            # Se omit_from_output=True, não envia linha original
+                            if rewritten_text:
+                                # Mas se foi reescrita via Note(), envia versão reescrita
+                                await self.broadcast_message(make_message("line", {"content": rewritten_text}))
+                            # Senão, suprime totalmente (não envia nada)
+                        else:
+                            # Sem omit_from_output, envia linha original normalmente
+                            await self.broadcast_message(make_message("line", {"content": output_line}))
 
                 # Se sobrou algo no buffer e parece ser um prompt (curto e sem newline), envia também
                 # Isso resolve o problema de telas de login/prompts que não enviam \n
@@ -294,10 +307,22 @@ class MudSession:
                     # Proteção: flush forçado se buffer exceder limite
                     if len(self.partial_buffer) > MUD_PARTIAL_BUFFER_MAX_BYTES:
                         logger.warning(f"Session {self.public_id}: Partial buffer overflow ({len(self.partial_buffer)} bytes), force flushing")
-                        await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
+                        self.sound_engine.process_line(self.partial_buffer)
+                        should_omit = self.sound_engine.get_last_omit_status()
+                        rewritten_text = self.sound_engine.get_last_rewritten_text()
+                        
+                        if not should_omit or rewritten_text:
+                            content = rewritten_text if rewritten_text else self.partial_buffer
+                            await self.broadcast_message(make_message("line", {"content": content}))
                         self.partial_buffer = ""
                     elif len(self.partial_buffer) < 1024 or parser.detect_input_prompt(self.partial_buffer):
-                        await self.broadcast_message(make_message("line", {"content": self.partial_buffer}))
+                        self.sound_engine.process_line(self.partial_buffer)
+                        should_omit = self.sound_engine.get_last_omit_status()
+                        rewritten_text = self.sound_engine.get_last_rewritten_text()
+                        
+                        if not should_omit or rewritten_text:
+                            content = rewritten_text if rewritten_text else self.partial_buffer
+                            await self.broadcast_message(make_message("line", {"content": content}))
                         # Limpa o buffer pois já enviamos
                         self.partial_buffer = ""
 

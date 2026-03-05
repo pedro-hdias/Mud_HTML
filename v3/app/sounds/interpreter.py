@@ -44,6 +44,7 @@ class SendInterpreter:
         self._config_table = config_table
         self._rng = rng
         self._events: List[Dict[str, Any]] = []
+        self._rewritten_text: Optional[str] = None  # Texto reexibido via Note()
 
     def run(self, send_text: str, delay_ms: int = 0) -> List[Dict[str, Any]]:
         """Executa send_text e retorna lista de eventos."""
@@ -54,6 +55,23 @@ class SendInterpreter:
         self._execute_lines(lines, delay_ms=delay_ms)
         
         return self._events
+    
+    def get_rewritten_text(self) -> Optional[str]:
+        """Retorna o texto reescrito via Note(), se houver."""
+        return self._rewritten_text
+    
+    def Note(self, text: str) -> None:
+        """
+        Reexibe texto. Usado com omit_from_output=True para reformatar texto.
+        
+        Exemplo: Note("%0") reexibe o text original
+                 Note("[Camera] %1") reexibe com prefixo
+        """
+        # Resolve variáveis no texto antes de armazenar
+        resolved_text = self._resolve_vars(text)
+        self._rewritten_text = resolved_text
+        logger.debug(f"[Note] Texto reescrito: '{resolved_text}'")
+
 
     def _prepare_lines(self, send_text: str) -> List[str]:
         """Prepara linhas para execução (remove comentários, tags, etc)."""
@@ -177,7 +195,11 @@ class SendInterpreter:
         """Executa uma declaração (atribuição ou função)."""
         line = self._resolve_vars(line)
 
-        if line.startswith("Execute(") or line.startswith("Note("):
+        if line.startswith("Note("):
+            self._handle_note(line)
+            return
+        
+        if line.startswith("Execute("):
             return
 
         if line.startswith("DoAfterSpecial("):
@@ -216,6 +238,16 @@ class SendInterpreter:
         action_code = self._strip_quotes(args[1])
         delay_ms = int(delay_seconds * 1000)
         self._execute_lines([action_code], delay_ms=delay_ms)
+
+    def _handle_note(self, line: str) -> None:
+        """Executa Note() para reexibir texto. Ex: Note("%0")"""
+        inner = line[len("Note("):-1].strip()
+        if not inner:
+            return
+        
+        # Remove aspas se presente
+        text = self._strip_quotes(inner)
+        self.Note(text)
 
     def _call_function(self, func: str, args: List[str], delay_ms: int, assign_to: Optional[str]) -> None:
         """Executa função (PlayGlobalSound, PlayCombatSound, StopSound)."""
