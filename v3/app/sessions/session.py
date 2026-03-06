@@ -18,6 +18,7 @@ from ..config import (
     MUD_READ_BUFFER_SIZE,
     MUD_IDLE_SLEEP_SECONDS,
     MUD_PARTIAL_BUFFER_MAX_BYTES,
+    MUD_CONNECTION_TIMEOUT_SECONDS,
     HISTORY_MAX_BYTES,
     HISTORY_MAX_LINES
 )
@@ -163,12 +164,20 @@ class MudSession:
         for ws in disconnected_clients:
             self.remove_websocket(ws)
     async def connect_to_mud(self) -> bool:
-        """Conecta ao servidor MUD"""
+        """Connects to the MUD server"""
         try:
-            self.reader, self.writer = await asyncio.open_connection(MUD_HOST, MUD_PORT)
+            self.reader, self.writer = await asyncio.wait_for(
+                asyncio.open_connection(MUD_HOST, MUD_PORT),
+                timeout=MUD_CONNECTION_TIMEOUT_SECONDS
+            )
             logger.info(f"Session {self.public_id}: TCP connection established")
             self.touch()
             return True
+        except asyncio.TimeoutError:
+            logger.error(f"Session {self.public_id}: Connection timed out after {MUD_CONNECTION_TIMEOUT_SECONDS}s")
+            self.reader = None
+            self.writer = None
+            return False
         except Exception as e:
             logger.exception(f"Session {self.public_id}: Connection failed: {e}")
             self.reader = None
@@ -246,7 +255,7 @@ class MudSession:
                     # Conexão fechada pelo servidor
                     await self.disconnect_from_mud()
                     await self.broadcast_message(make_message("system", {
-                        "message": "Conexão encerrada pelo servidor"
+                        "message": "Connection closed by server"
                     }))
                     break
                 
@@ -267,7 +276,7 @@ class MudSession:
                         await self.broadcast_message(make_message("line", {"content": line}))
                         await self.disconnect_from_mud()
                         await self.broadcast_message(make_message("system", {
-                            "message": "Desconectado do servidor"
+                            "message": "Disconnected from server"
                         }))
                         return
 
@@ -332,6 +341,6 @@ class MudSession:
                 logger.exception(f"Session {self.public_id}: Error reading from MUD: {e}")
                 await self.disconnect_from_mud()
                 await self.broadcast_message(make_message("system", {
-                    "message": f"Erro de conexão: {e}"
+                    "message": f"Connection error: {e}"
                 }))
                 break

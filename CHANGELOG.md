@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.3 (2026-03-06)
+
+### Corrigido (issue #45 — the eternal connection)
+- adicionado timeout de 10 segundos na tentativa de conexão TCP ao servidor MUD (`connect_to_mud`), evitando que o cliente ficasse preso indefinidamente no estado "Connecting..." quando o servidor estava indisponível
+- botão "Cancel attempt" agora também é exibido durante o estado inicial de conexão (`CONNECTING`), permitindo ao usuário cancelar sem precisar aguardar o timeout
+- ao cancelar a tentativa, o WebSocket é encerrado corretamente independente do estado (`CONNECTING` ou `OPEN`), garantindo limpeza completa no backend
+- a área de saída agora é limpa automaticamente ao iniciar uma nova tentativa de conexão a partir do estado desconectado, removendo mensagens de erro de tentativas anteriores (ex.: "[SYSTEM] Failed to connect to server")
+- o status de conexão exibido na interface passou a usar inglês consistente (`Connecting...`, `Connected`, `Disconnected`, `Reconnecting...`, `Awaiting login`), em vez de português
+- mensagens do sistema enviadas pelo backend (`Connection closed by server`, `Disconnected from server`, `Connection error`) traduzidas para inglês
+
 ## v3.2 (2026-03-03)
 
 ### Adicionado
