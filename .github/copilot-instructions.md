@@ -27,7 +27,7 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 - Use `Final` para constantes de configuração em `config.py`.
 - Prefira `async`/`await` para operações de I/O.
 - Mantenha a separação de responsabilidades: configuração em `config.py`, lógica de negócio nos módulos correspondentes.
-- Use `logger` do módulo `app.logger` para logging.
+- Use `get_logger(name)` do módulo `app.logger` para obter um logger nomeado.
 
 ### JavaScript (Frontend)
 
