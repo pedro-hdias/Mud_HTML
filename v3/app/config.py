@@ -15,6 +15,7 @@ MUD_READ_BUFFER_SIZE: Final[int] = 4096
 MUD_IDLE_SLEEP_SECONDS: Final[float] = 0.05
 MUD_QUIT_GRACE_SECONDS: Final[float] = 0.5
 MUD_PARTIAL_BUFFER_MAX_BYTES: Final[int] = 65536  # 64KB - flush forçado se exceder
+MUD_CONNECTION_TIMEOUT_SECONDS: Final[float] = 10.0  # TCP connection timeout
 
 # Rate limiting (WebSocket)
 WS_RATE_LIMIT_MAX_MESSAGES: Final[int] = int(os.environ.get("WS_RATE_LIMIT_MAX_MESSAGES", 15))
