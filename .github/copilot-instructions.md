@@ -43,7 +43,7 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 
 ## Fluxo de Desenvolvimento
 
-1. Issues são criadas na branch `develop` via workflow `issue-to-develop.yml`.
+1. Branches de issue (ex: `*/issue42`) disparam o workflow `issue-to-develop.yml`, que abre automaticamente um PR para `develop`.
 2. Funcionalidades são desenvolvidas em branches `feature/*` e integradas via PR para `develop`.
 3. A branch `develop` é promovida para `main` via workflow `develop-to-main-release.yml`.
 4. Releases são publicadas automaticamente pelo workflow `main-create-release.yml`.
