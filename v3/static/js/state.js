@@ -236,7 +236,7 @@ function updateConnectionState(state) {
 
     switch (state) {
         case "DISCONNECTED":
-            UIHelpers.setStatusIndicator({ text: "Desconectado" });
+            UIHelpers.setStatusIndicator({ text: "Disconnected" });
             UIHelpers.setReconnectControls({ visible: false });
             UIHelpers.setButtonsState({
                 loginVisible: true,
@@ -259,10 +259,10 @@ function updateConnectionState(state) {
 
         case "CONNECTING":
             UIHelpers.setStatusIndicator({
-                text: "Conectando...",
+                text: "Connecting...",
                 stateClass: CONFIG.CLASSES.connecting
             });
-            UIHelpers.setReconnectControls({ visible: false });
+            UIHelpers.setReconnectControls({ visible: true, text: "Connecting..." });
             UIHelpers.setButtonsState({
                 loginVisible: false,
                 disconnectVisible: false,
@@ -270,14 +270,18 @@ function updateConnectionState(state) {
                 inputDisabled: true
             });
             UIHelpers.setMainContentVisibility(true);
+            // Clear old output from a previous session when starting a fresh connection
+            if (previousState === "DISCONNECTED") {
+                UIHelpers.clearOutput();
+            }
             break;
 
         case "RECONNECTING":
             UIHelpers.setStatusIndicator({
-                text: "Reconectando...",
+                text: "Reconnecting...",
                 stateClass: CONFIG.CLASSES.connecting
             });
-            UIHelpers.setReconnectControls({ visible: true });
+            UIHelpers.setReconnectControls({ visible: true, text: "Reconnecting..." });
             UIHelpers.setButtonsState({
                 loginVisible: false,
                 disconnectVisible: false,
@@ -289,7 +293,7 @@ function updateConnectionState(state) {
 
         case "CONNECTED":
             UIHelpers.setStatusIndicator({
-                text: "Conectado",
+                text: "Connected",
                 stateClass: CONFIG.CLASSES.connected
             });
             UIHelpers.setReconnectControls({ visible: false });
@@ -326,7 +330,7 @@ function updateConnectionState(state) {
 
         case "AWAITING_LOGIN":
             UIHelpers.setStatusIndicator({
-                text: "Aguardando login",
+                text: "Awaiting login",
                 stateClass: CONFIG.CLASSES.connected
             });
             UIHelpers.setReconnectControls({ visible: false });

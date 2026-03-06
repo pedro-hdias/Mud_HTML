@@ -460,11 +460,16 @@ const UIHelpers = {
         setTimeout(() => input.classList.remove("input-flash"), 200);
     },
 
-    setReconnectControls({ visible }) {
+    setReconnectControls({ visible, text }) {
         const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
         if (!reconnectStatus) return;
 
         if (visible) {
+            // Update the status text if provided
+            if (text) {
+                const span = reconnectStatus.querySelector("span");
+                if (span) span.textContent = text;
+            }
             reconnectStatus.classList.add(CONFIG.CLASSES.show);
             reconnectStatus.classList.remove('hidden');
             reconnectStatus.removeAttribute('hidden');
