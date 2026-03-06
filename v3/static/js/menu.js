@@ -189,6 +189,11 @@ const MenuManager = {
         this.keyboardHandler = (e) => {
             if (!this.currentMenu) return;
 
+            // Não intercepta teclas digitadas em campos de input ou textarea
+            if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+                return;
+            }
+
             // Ignora se modal está aberto
             const loginModal = getElement(CONFIG.SELECTORS.loginModal);
             const confirmModal = getElement(CONFIG.SELECTORS.confirmModal);
