@@ -34,7 +34,7 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 - Use JavaScript puro (sem frameworks).
 - Centralize configurações em `config.js`.
 - Use `createLogger("nome-do-modulo")` para logging consistente.
-- Separe responsabilidades em arquivos distintos (ex: `prompts.js`, `sounds.js`, `ws.js`).
+- Separe responsabilidades em arquivos distintos (ex: `prompts.js`, `sound-handler.js`, `ws.js`).
 
 ### HTML/CSS
 
