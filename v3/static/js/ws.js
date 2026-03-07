@@ -514,6 +514,14 @@ function handleLineMessage(payload) {
         checkAndShowLogin();
     }
 
+    // Ativa entrada segura (tipo password) quando o servidor solicita senha
+    // Remove códigos ANSI antes de comparar (ex: reset \x1b[0m no final do prompt colorido)
+    const lineTextClean = lineText.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
+    const hasPasswordPrompt = /password:$/.test(lineTextClean) || /senha:$/.test(lineTextClean);
+    if (hasPasswordPrompt) {
+        UIHelpers.setInputSecure(true);
+    }
+
     // Detect in-game signals to transition session phase
     detectSessionPhaseFromLine(payload.content);
 
