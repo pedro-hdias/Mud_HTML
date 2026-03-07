@@ -12,9 +12,9 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 
 ### Estrutura Principal
 
-- `v3/app/` — Backend Python (FastAPI, WebSocket, sessões, sons)
-- `v3/static/` — Frontend (HTML, CSS, JS)
-- `v3/Dockerfile` — Imagem Docker da versão atual
+- `v4/app/` — Backend Python (FastAPI, WebSocket, sessões, sons)
+- `v4/static/` — Frontend (HTML, CSS, JS)
+- `v4/Dockerfile` — Imagem Docker da versão atual
 - `docker-compose.yml` — Composição de serviços
 - `.github/workflows/` — Pipelines de CI/CD
 
@@ -51,7 +51,7 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 
 ## Testes
 
-- Execute os testes com `pytest` a partir da pasta `v3/`.
+- Execute os testes com `pytest` a partir da pasta `v4/`.
 - Mantenha cobertura de testes para módulos críticos (ex: `sounds`, `sessions`).
 
 ## Docker
@@ -62,7 +62,7 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
   ```
 - Para buildar a imagem:
   ```bash
-  cd v3
+  cd v4
   docker build -t mudclient .
   docker run -d -p 80:80 mudclient
   ```
