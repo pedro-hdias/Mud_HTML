@@ -463,20 +463,67 @@ const UIHelpers = {
     /**
      * Alterna o tipo do input principal entre "password" (entrada segura)
      * e "text" (entrada normal). Usado quando o servidor solicita senha.
+     * Também ajusta placeholder e atributos ARIA para evitar mensagens enganosas.
      * @param {boolean} secure - true para entrada segura (senha), false para texto normal
      */
     setInputSecure(secure) {
         const input = getElement(CONFIG.SELECTORS.input);
         if (!input) return;
+
+        // Salva configurações originais uma única vez, usando dataset
+        if (!input.dataset.originalType) {
+            input.dataset.originalType = input.type || "text";
+        }
+        if (!input.dataset.originalPlaceholder) {
+            // Usa string vazia se não houver placeholder definido
+            input.dataset.originalPlaceholder = input.placeholder || "";
+        }
+        if (!input.dataset.originalAriaLabel) {
+            input.dataset.originalAriaLabel = input.getAttribute("aria-label") || "";
+        }
+        if (!input.dataset.originalAriaDescribedby) {
+            input.dataset.originalAriaDescribedby = input.getAttribute("aria-describedby") || "";
+        }
+
         // Evita atualizações desnecessárias no DOM se já estiver no estado correto
         if (secure === (input.type === "password")) return;
+
         if (secure) {
+            // Modo seguro: campo de senha
             input.type = "password";
-            input.setAttribute("aria-label", "Enter password (hidden)");
+            // Aria-label específico para senha; se houver configuração customizada, pode ser lida de data-*
+            const secureAriaLabel = input.dataset.secureAriaLabel || "Enter password (hidden)";
+            input.setAttribute("aria-label", secureAriaLabel);
+            // Placeholder específico para senha; se existir configuração customizada, priorize-a
+            const securePlaceholder = input.dataset.securePlaceholder || "Enter password...";
+            input.placeholder = securePlaceholder;
+            // Em modo senha, normalmente as dicas de comando não se aplicam
+            input.removeAttribute("aria-describedby");
             input.setAttribute("autocomplete", "current-password");
         } else {
-            input.type = "text";
-            input.setAttribute("aria-label", "Enter a command (multiple: use semicolon)");
+            // Modo normal: restaura configurações originais
+            input.type = input.dataset.originalType || "text";
+
+            const originalAriaLabel = input.dataset.originalAriaLabel || "";
+            if (originalAriaLabel) {
+                input.setAttribute("aria-label", originalAriaLabel);
+            } else {
+                input.removeAttribute("aria-label");
+            }
+
+            const originalPlaceholder = input.dataset.originalPlaceholder || "";
+            if (originalPlaceholder) {
+                input.placeholder = originalPlaceholder;
+            } else {
+                input.removeAttribute("placeholder");
+            }
+
+            const originalAriaDescribedby = input.dataset.originalAriaDescribedby || "";
+            if (originalAriaDescribedby) {
+                input.setAttribute("aria-describedby", originalAriaDescribedby);
+            } else {
+                input.removeAttribute("aria-describedby");
+            }
             input.removeAttribute("autocomplete");
         }
     },
