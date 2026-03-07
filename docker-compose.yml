@@ -1,11 +1,11 @@
 services:
   mud-html:
-    build: ./v3
+    build: ./v4
     container_name: mud-html-dev
     ports:
       - "80:80"
     volumes:
-      - ./v3:/app
+      - ./v4:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
     environment:
       - PYTHONUNBUFFERED=1
