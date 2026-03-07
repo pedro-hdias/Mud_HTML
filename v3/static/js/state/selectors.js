@@ -2,7 +2,7 @@
  * state/selectors.js - Seletores e atualizações de UI baseadas em estado
  * Contém funções que lêem o estado e atualizam a interface correspondente.
  * Depende de: state/store.js, state/mutations.js, state/persistence.js,
- *             ui.js/ui/index.js (UIHelpers), config.js (CONFIG, getElement)
+ *             ui/index.js (UIHelpers), config.js (CONFIG, getElement)
  */
 
 /**

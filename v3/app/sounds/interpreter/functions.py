@@ -18,7 +18,7 @@ def next_sound_id(variables: dict) -> str:
 
 
 def emit_sound_event(
-    path: str,
+    path: Optional[str],
     channel: str,
     pan: Optional[int],
     delay_ms: int,
@@ -30,7 +30,7 @@ def emit_sound_event(
     Emite evento de som para a fila de eventos.
 
     Args:
-        path: Caminho normalizado do som
+        path: Caminho normalizado do som (ou None se não encontrado)
         channel: Canal (global, combat, etc)
         pan: Panning value
         delay_ms: Delay em ms

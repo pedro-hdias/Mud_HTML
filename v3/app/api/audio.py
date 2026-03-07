@@ -67,7 +67,7 @@ async def audio_performance_metrics():
                 "compiled": stats["cached_matchers"],
                 "total_rules": stats["total_rules"],
                 "coverage_percentage": stats["cache_coverage"],
-                "benefit": "Matchers compilados en cache evitam recompilação en cada línea procesada"
+                "benefit": "Matchers compilados em cache evitam recompilação em cada linha processada"
             },
             "timestamp": stats["timestamp"],
         }

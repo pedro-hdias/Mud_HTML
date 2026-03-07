@@ -142,7 +142,11 @@ const _UIHelperMethods = {
             if (summary) {
                 summary.textContent = '🎯 All history loaded';
             }
-            loader.setAttribute('disabled', 'disabled');
+            loader.classList.add('history-loader--disabled');
+            loader.setAttribute('aria-disabled', 'true');
+        } else {
+            loader.classList.remove('history-loader--disabled');
+            loader.removeAttribute('aria-disabled');
         }
     },
 

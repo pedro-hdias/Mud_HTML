@@ -5,7 +5,7 @@
  * requestOlderHistory.
  * Mesclados em EventManager via Object.assign em events/bindings.js.
  * Depende de: config.js, state/store.js, state/persistence.js, ui/index.js (UIHelpers),
- *             modals.js (ModalManager), ws.js (sendCommand, sendLogin, sendMessage),
+ *             modals.js (ModalManager), ws/client.js (sendCommand, sendLogin, sendMessage),
  *             events/keyboard.js (eventsLogger)
  */
 
@@ -165,14 +165,16 @@ const _EventActionsMethods = {
             return;
         }
 
-        if (typeof WebSocketManager !== "undefined" && WebSocketManager.sendMessage) {
+        if (typeof sendMessage === "function") {
             eventsLogger.log(`Requesting history from line ${fromLineIndex}`);
-            WebSocketManager.sendMessage("request_history", {
+            sendMessage("request_history", {
                 from_line_index: fromLineIndex,
                 num_lines: 25
             });
 
             UIHelpers.setHistoryLoading(getElement(CONFIG.SELECTORS.output), true);
+        } else {
+            eventsLogger.warn("sendMessage não disponível - não foi possível requisitar histórico antigo");
         }
     }
 };

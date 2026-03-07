@@ -136,7 +136,7 @@ function handleHistoryMessage(payload) {
     const isRecent = payload.is_recent || false;
     const hasMoreHistory = payload.has_more_history || false || CONFIG.DEBUG_FORCE_HISTORY_BUTTON;
 
-    wsLogger.log(`📜 Histórico recebido:`, {
+    wsLogger.debug(`📜 Histórico recebido:`, {
         isRecent,
         hasMoreHistory,
         contentLength: (payload.content || '').length,
@@ -149,21 +149,21 @@ function handleHistoryMessage(payload) {
 
         // Se houver mais histórico, mostrar loader sob demanda
         if (hasMoreHistory) {
-            wsLogger.log("✅ Criando history loader (hasMoreHistory === true)");
+            wsLogger.debug("✅ Criando history loader (hasMoreHistory === true)");
             const output = getElement(CONFIG.SELECTORS.output);
             if (output) {
                 const loader = UIHelpers.ensureHistoryLoader(output);
-                wsLogger.log("📦 Elemento history loader:", loader);
-                wsLogger.log("📍 Loader no DOM:", document.contains(loader));
-                wsLogger.log("👁️ Visibilidade do loader:", window.getComputedStyle(loader).display);
-                wsLogger.log("📏 Posição do loader:", loader.getBoundingClientRect());
-                wsLogger.log("🔍 Scroll do output:", { scrollTop: output.scrollTop, scrollHeight: output.scrollHeight, clientHeight: output.clientHeight });
+                wsLogger.debug("📦 Elemento history loader:", loader);
+                wsLogger.debug("📍 Loader no DOM:", document.contains(loader));
+                wsLogger.debug("👁️ Visibilidade do loader:", window.getComputedStyle(loader).display);
+                wsLogger.debug("📏 Posição do loader:", loader.getBoundingClientRect());
+                wsLogger.debug("🔍 Scroll do output:", { scrollTop: output.scrollTop, scrollHeight: output.scrollHeight, clientHeight: output.clientHeight });
                 UIHelpers.updateHistoryLoaderState(output, true, 25);
             } else {
                 wsLogger.error("❌ Elemento output não encontrado!");
             }
         } else {
-            wsLogger.log("⚠️ Sem mais histórico (hasMoreHistory === false), ignorando loader");
+            wsLogger.debug("⚠️ Sem mais histórico (hasMoreHistory === false), ignorando loader");
         }
     } else {
         // Histórico sob demanda: adicionar ao loader

@@ -2,7 +2,7 @@
  * menu/controller.js - MenuManager: coordenador do ciclo de vida dos menus
  * Mescla todos os grupos de métodos dos submódulos em MenuManager.
  * Depende de: menu/parser.js, menu/state.js, menu/renderer.js,
- *             ui/index.js (UIHelpers), ws.js (sendCommand)
+ *             ui/index.js (UIHelpers), ws/client.js (sendCommand)
  */
 
 const MenuManager = Object.assign(

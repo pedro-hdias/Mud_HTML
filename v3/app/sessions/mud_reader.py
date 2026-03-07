@@ -4,7 +4,6 @@ MudReader - Loop de leitura de dados do servidor MUD
 import asyncio
 
 from ..mud import parser
-from ..mud.state import ConnectionState
 from ..config import (
     MUD_READ_BUFFER_SIZE,
     MUD_PARTIAL_BUFFER_MAX_BYTES,

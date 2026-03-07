@@ -145,6 +145,10 @@ const EventManager = Object.assign(
             output.addEventListener("click", (e) => {
                 const loader = e.target.closest('details.history-loader');
                 if (loader) {
+                    if (loader.getAttribute('aria-disabled') === 'true') {
+                        e.preventDefault();
+                        return;
+                    }
                     if (loader.open) {
                         eventsLogger.log("History loader expanded - requesting older messages");
                         this.requestOlderHistory(loader);

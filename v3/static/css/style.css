@@ -665,6 +665,18 @@ details.history-loader {
     background: var(--bg-hover);
 }
 
+.history-loader--disabled {
+    opacity: 0.5;
+    animation: none;
+    border-color: var(--border-color);
+    box-shadow: none;
+}
+
+.history-loader--disabled summary {
+    cursor: default;
+    pointer-events: none;
+}
+
 .history-loader .loader-text {
     font-weight: 500;
     color: var(--text-secondary);

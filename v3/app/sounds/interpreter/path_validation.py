@@ -1,7 +1,6 @@
 """
 Validação de caminhos de som e resolução via registry.
 """
-import os
 from pathlib import Path
 from typing import Callable, Optional
 
