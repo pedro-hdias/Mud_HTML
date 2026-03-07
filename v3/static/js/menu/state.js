@@ -15,8 +15,8 @@ const _MenuStateMethods = {
             document.removeEventListener("keydown", this.keyboardHandler);
         }
 
-        // Calcula o comprimento máximo das chaves do menu atual
-        this.maxKeyLength = Math.max(...this.currentMenu.options.map(opt => opt.key.length));
+        // Calcula o comprimento máximo das chaves do menu atual (mínimo 1 para evitar -Infinity)
+        this.maxKeyLength = Math.max(1, ...this.currentMenu.options.map(opt => opt.key.length));
         this.inputBuffer = "";
 
         menuLogger.log(`Menu com ${this.currentMenu.options.length} opções, comprimento máximo: ${this.maxKeyLength}`);
