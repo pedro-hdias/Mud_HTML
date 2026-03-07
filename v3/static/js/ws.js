@@ -515,7 +515,9 @@ function handleLineMessage(payload) {
     }
 
     // Ativa entrada segura (tipo password) quando o servidor solicita senha
-    const hasPasswordPrompt = /password:$/.test(lineText.trimEnd()) || /senha:$/.test(lineText.trimEnd());
+    // Remove códigos ANSI antes de comparar (ex: reset \x1b[0m no final do prompt colorido)
+    const lineTextClean = lineText.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
+    const hasPasswordPrompt = /password:$/.test(lineTextClean) || /senha:$/.test(lineTextClean);
     if (hasPasswordPrompt) {
         UIHelpers.setInputSecure(true);
     }

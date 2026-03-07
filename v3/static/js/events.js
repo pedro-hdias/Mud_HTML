@@ -366,15 +366,17 @@ const EventManager = {
         const input = getElement(CONFIG.SELECTORS.input);
         if (!input) return;
 
-        const command = input.value.trim();
+        // Em modo senha, usa o valor bruto sem trim() para preservar espaços na senha
+        const isPasswordMode = input.type === "password";
+        const command = isPasswordMode ? input.value : input.value.trim();
         if (command) {
             if (StateStore.getConnectionState() !== "CONNECTED") {
                 eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
                 return;
             }
 
-            eventsLogger.log("Sending command", command);
-            this._pushCommandHistory(command);
+            eventsLogger.log("Sending command", isPasswordMode ? "***" : command);
+            if (!isPasswordMode) this._pushCommandHistory(command);
             sendCommand(command);
             input.value = "";
             // Restaura o input para texto normal após envio (ex: após digitar senha)
