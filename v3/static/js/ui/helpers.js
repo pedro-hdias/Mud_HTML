@@ -140,7 +140,7 @@ const _UIHelperMethods = {
         if (!hasMore) {
             const summary = loader.querySelector('summary');
             if (summary) {
-                summary.textContent = '🎯 All history loaded';
+                summary.textContent = '🎯 Todo o histórico carregado';
             }
             loader.classList.add('history-loader--disabled');
             loader.setAttribute('aria-disabled', 'true');
