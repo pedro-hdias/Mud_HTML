@@ -666,10 +666,10 @@ function cancelReconnectAttempt() {
     StateStore.setIsReconnecting(false);
     updateConnectionState("DISCONNECTED");
 
-    if (ws && ws.readyState === WebSocket.CONNECTING) {
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
         ws.close();
     }
 
-    UIHelpers.addSystemMessage("[SYSTEM] Reconnection cancelled.", "orange");
+    UIHelpers.addSystemMessage("[SYSTEM] Connection cancelled.", "orange");
 }
 
