@@ -178,7 +178,14 @@
     <script src="/static/js/sound-handler.js"></script>
     <script src="/static/js/volume-control.js"></script>
     <script src="/static/js/audio-menu-control.js?v=20260303-1"></script>
-    <script src="/static/js/ws.js"></script>
+    <!-- Pacote WebSocket modularizado (ws/) -->
+    <script src="/static/js/ws/protocol.js"></script>
+    <script src="/static/js/ws/command-queue.js"></script>
+    <script src="/static/js/ws/reconnect.js"></script>
+    <script src="/static/js/ws/handlers.js"></script>
+    <script src="/static/js/ws/session-init.js"></script>
+    <script src="/static/js/ws/transport.js"></script>
+    <script src="/static/js/ws/client.js"></script>
 
     <div id="screen-reader-announcer" aria-live="polite" aria-atomic="false"
         style="position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;">
