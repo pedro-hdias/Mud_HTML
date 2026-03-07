@@ -377,6 +377,8 @@ const EventManager = {
             this._pushCommandHistory(command);
             sendCommand(command);
             input.value = "";
+            // Restaura o input para texto normal após envio (ex: após digitar senha)
+            UIHelpers.setInputSecure(false);
             input.focus();
             UIHelpers.flashInput();
             return;

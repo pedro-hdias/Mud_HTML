@@ -514,6 +514,12 @@ function handleLineMessage(payload) {
         checkAndShowLogin();
     }
 
+    // Ativa entrada segura (tipo password) quando o servidor solicita senha
+    const hasPasswordPrompt = /password:$/.test(lineText.trimEnd()) || /senha:$/.test(lineText.trimEnd());
+    if (hasPasswordPrompt) {
+        UIHelpers.setInputSecure(true);
+    }
+
     // Detect in-game signals to transition session phase
     detectSessionPhaseFromLine(payload.content);
 

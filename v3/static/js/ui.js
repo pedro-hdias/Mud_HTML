@@ -460,6 +460,27 @@ const UIHelpers = {
         setTimeout(() => input.classList.remove("input-flash"), 200);
     },
 
+    /**
+     * Alterna o tipo do input principal entre "password" (entrada segura)
+     * e "text" (entrada normal). Usado quando o servidor solicita senha.
+     * @param {boolean} secure - true para entrada segura (senha), false para texto normal
+     */
+    setInputSecure(secure) {
+        const input = getElement(CONFIG.SELECTORS.input);
+        if (!input) return;
+        // Evita atualizações desnecessárias no DOM se já estiver no estado correto
+        if (secure === (input.type === "password")) return;
+        if (secure) {
+            input.type = "password";
+            input.setAttribute("aria-label", "Enter password (hidden)");
+            input.setAttribute("autocomplete", "current-password");
+        } else {
+            input.type = "text";
+            input.setAttribute("aria-label", "Enter a command (multiple: use semicolon)");
+            input.removeAttribute("autocomplete");
+        }
+    },
+
     setReconnectControls({ visible, text }) {
         const reconnectStatus = getElement(CONFIG.SELECTORS.reconnectStatus);
         if (!reconnectStatus) return;
