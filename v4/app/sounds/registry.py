@@ -31,7 +31,7 @@ class SoundRegistry:
         Inicializa registry.
         
         Args:
-            sounds_dir: Diretório de sons (padrão: v3/static/sounds)
+            sounds_dir: Diretório de sons (padrão: static/sounds relativo à raiz do projeto)
         """
         if sounds_dir is None:
             sounds_dir = Path(__file__).resolve().parents[2] / "static" / "sounds"
