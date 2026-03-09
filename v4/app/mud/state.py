@@ -21,4 +21,4 @@ def log_state_read(state: ConnectionState, context: str = "") -> None:
     message = f"State read: {state.value}"
     if context:
         message = f"{message} ({context})"
-    logger.info(message)
+    logger.debug(message)

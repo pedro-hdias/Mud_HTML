@@ -277,10 +277,10 @@ class SendInterpreter:
 
             # ⚠️ VALIDAÇÃO DE PSEUDO-CANAIS: Descartar canais de sistema que não existem
             if not self._is_valid_channel_sound(path):
-                logger.info(f"[PlaySound] Pseudo-canal de sistema ignorado: '{path}'")
+                logger.debug(f"[PlaySound] Pseudo-canal de sistema ignorado: '{path}'")
                 return
 
-            logger.info(
+            logger.debug(
                 f"[PlaySound] Tentativa: func={func}, original_path='{path}', "
                 f"channel={channel}, delay_ms={delay_ms}"
             )
@@ -303,13 +303,16 @@ class SendInterpreter:
                 # 🎵 FALLBACK: Tocar som padrão se disponível
                 fallback = self._get_fallback_sound(channel)
                 if fallback:
-                    logger.info(f"[PlaySound] 🔄 Usando fallback: {fallback}")
+                    logger.debug(f"[PlaySound] 🔄 Usando fallback: {fallback}")
                     self._emit_sound_event(fallback, channel, None, delay_ms, "fallback")
-                    return
+                else:
+                    # Sem fallback disponível: não emitir evento com path=None
+                    logger.debug(f"[PlaySound] Arquivo '{path}' não encontrado e sem fallback — evento descartado")
+                return
 
             pan = int(self._eval_value(args[1])) if len(args) > 1 else None
 
-            logger.info(
+            logger.debug(
                 f"[PlaySound] ✓ Som criado: path='{normalized_path}', pan={pan}, delay_ms={delay_ms}"
             )
 

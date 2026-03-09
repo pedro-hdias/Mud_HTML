@@ -125,7 +125,7 @@ class PrometheusSoundEngine:
             if not rule.keep_evaluating:
                 break
         
-        logger.info(f"Linha processada: {matched_rules} regras combinadas, {len(events)} eventos gerados")
+        logger.debug(f"Linha processada: {matched_rules} regras combinadas, {len(events)} eventos gerados")
         return events
 
     def get_last_omit_status(self) -> bool:

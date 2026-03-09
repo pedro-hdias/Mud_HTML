@@ -316,18 +316,17 @@ class TestSupportedFunctions:
         assert interp._events[0]["path"] == normalizado
 
     @patch("app.sounds.interpreter.get_registry")
-    def test_play_global_sound_path_nao_encontrado_tenta_fallback(self, mock_get_registry):
+    def test_play_global_sound_path_nao_encontrado_sem_fallback_descarta_evento(self, mock_get_registry):
         """Quando path não existe no registry E fallback também não existe,
-        o evento ainda é emitido (path=None). Documenta comportamento atual do motor.
+        nenhum evento é emitido (comportamento correto: não enviar path=None ao cliente).
         """
         reg = _mock_registry(get_return=None, resolve_return=None)
         mock_get_registry.return_value = reg
         interp = _make_interpreter()
         interp.run('PlayGlobalSound("General/Misc/Test.ogg")')
-        # O motor atual emite evento mesmo com path=None quando fallback não existe
+        # Sem arquivo e sem fallback, nenhum evento de play deve ser emitido
         play_events = [e for e in interp._events if e.get("action") == "play"]
-        assert len(play_events) == 1
-        assert play_events[0]["path"] is None
+        assert len(play_events) == 0
 
 
 # ──────────────────────────────────────────────
