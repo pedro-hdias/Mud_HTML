@@ -26,6 +26,34 @@ Subir em modo produção:
 docker compose -f docker-compose.prod.yml up -d --build
 ```
 
+### Publicar o diário em `/shamy/` (upload manual)
+
+Se você for enviar os arquivos do diário manualmente (ex.: zip extraído), coloque o conteúdo em:
+
+```text
+v4/static/shamy/
+```
+
+Estrutura esperada:
+
+```text
+v4/static/shamy/index.html
+v4/static/shamy/Entries/
+v4/static/shamy/Resources/
+```
+
+Depois rode o build normal:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+URL final para a pessoa acessar direto:
+
+```text
+http://SEU_DOMINIO_OU_IP/shamy/
+```
+
 Atualizar versão na VPS (pull + rebuild + restart):
 
 ```bash

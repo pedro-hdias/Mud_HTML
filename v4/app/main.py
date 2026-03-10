@@ -3,9 +3,11 @@ Ponto de entrada da aplicação FastAPI.
 Bootstrap, middleware e routers.
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 
 from .ws import session_manager
 from .logger import get_logger
@@ -44,10 +46,20 @@ app = FastAPI(lifespan=lifespan)
 # Arquivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Diário opcional: se a pasta existir no deploy, expõe em /shamy/
+SHAMY_DIR = Path("static/shamy")
+if SHAMY_DIR.is_dir():
+    app.mount("/shamy", StaticFiles(directory=str(SHAMY_DIR), html=True), name="shamy")
+
 
 @app.get("/")
 def index():
     return FileResponse("static/index.html")
+
+
+@app.get("/shamy")
+def shamy_redirect():
+    return RedirectResponse(url="/shamy/", status_code=301)
 
 
 # Inclui routers de domínio
