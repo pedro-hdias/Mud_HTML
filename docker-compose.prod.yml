@@ -13,3 +13,24 @@ services:
       start_period: 10s
       retries: 3
     restart: unless-stopped
+
+  diario:
+    build:
+      context: ./v4/static/shamy
+    container_name: diario-web
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./v4/static/shamy/backend
+    container_name: diario-backend
+    volumes:
+      - diario-data:/data
+    restart: unless-stopped
+
+volumes:
+  diario-data:

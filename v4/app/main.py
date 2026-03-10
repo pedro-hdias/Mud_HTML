@@ -14,7 +14,7 @@ from .logger import get_logger
 from .sounds.registry import get_registry
 from .config import AUDIO_DEBUG_DETAILS
 
-from .api import health, sessions, logs, websocket, audio
+from .api import health, sessions, logs, websocket, audio, diario_proxy
 
 logger = get_logger("main")
 
@@ -68,3 +68,4 @@ app.include_router(sessions.router)
 app.include_router(logs.router)
 app.include_router(websocket.router)
 app.include_router(audio.router)
+app.include_router(diario_proxy.router)
