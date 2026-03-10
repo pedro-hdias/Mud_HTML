@@ -29,11 +29,13 @@ function splitCommands(commandText) {
  * Comandos simples e macros são enviados imediatamente.
  * Usa late binding para sendMessage (definido em transport.js, carregado depois).
  * @param {string} commandText
+ * @param {boolean} [raw=false] - true para senhas: envia sem trim nem split por ';'
  */
-function sendCommand(commandText) {
+function sendCommand(commandText, raw = false) {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-        // Se estamos reconectando, enfileira o comando
-        if (StateStore.isReconnecting() && pendingCommandQueue.length < CONFIG.COMMAND_QUEUE_MAX) {
+        // Em modo raw (senha), não enfileira: senhas não devem ser armazenadas em memória
+        // na fila de comandos pendentes por questões de segurança
+        if (!raw && StateStore.isReconnecting() && pendingCommandQueue.length < CONFIG.COMMAND_QUEUE_MAX) {
             pendingCommandQueue.push(commandText);
             wsLogger.log("Comando enfileirado durante reconexão", commandText, `(${pendingCommandQueue.length} na fila)`);
             UIHelpers.addSystemMessage(`[SYSTEM] Command queued (reconnecting...) [${pendingCommandQueue.length}/${CONFIG.COMMAND_QUEUE_MAX}]`, "#888");
@@ -41,6 +43,13 @@ function sendCommand(commandText) {
         }
         wsLogger.error("Não é possível enviar comando - WebSocket não conectado");
         UIHelpers.addSystemMessage("[SYSTEM] Not connected - reconnecting...", "orange");
+        return;
+    }
+
+    // Modo raw: envia exatamente o valor recebido, sem divisão nem trim (usado para senhas)
+    if (raw) {
+        wsLogger.log("Enviando comando (raw)");  // não loga o valor por segurança
+        sendMessage("command", { value: commandText });
         return;
     }
 

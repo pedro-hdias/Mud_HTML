@@ -13,7 +13,7 @@ def make_message(message_type: str, payload: Optional[Dict[str, Any]] = None, me
 
 
 # Tipos de mensagem válidos que o servidor aceita
-_VALID_CLIENT_MESSAGE_TYPES = frozenset({"init", "connect", "disconnect", "login", "command"})
+_VALID_CLIENT_MESSAGE_TYPES = frozenset({"init", "connect", "disconnect", "login", "command", "request_history"})
 # Tamanho máximo de uma mensagem bruta (bytes)
 _MAX_RAW_MESSAGE_SIZE = 8192
 

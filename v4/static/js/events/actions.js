@@ -83,7 +83,8 @@ const _EventActionsMethods = {
 
             eventsLogger.log("Sending command", isPasswordMode ? "***" : command);
             if (!isPasswordMode) this._pushCommandHistory(command);
-            sendCommand(command);
+            // Em modo senha, passa raw=true para evitar trim/split por ';' em senhas
+            sendCommand(command, isPasswordMode);
             input.value = "";
             // Restaura input para texto normal após envio (ex: após digitar senha)
             UIHelpers.setInputSecure(false);
