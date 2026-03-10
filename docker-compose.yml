@@ -1,12 +1,9 @@
 services:
   mud-html:
     build: ./v4
-    container_name: mud-html-dev
+    container_name: mud-html
     ports:
       - "80:80"
-    volumes:
-      - ./v4:/app
-    command: uvicorn app.main:app --host 0.0.0.0 --port 80 --reload
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
@@ -16,3 +13,24 @@ services:
       start_period: 10s
       retries: 3
     restart: unless-stopped
+
+  diario:
+    build:
+      context: ./v4/static/shamy
+    container_name: diario-web
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./v4/static/shamy/backend
+    container_name: diario-backend
+    volumes:
+      - diario-data:/data
+    restart: unless-stopped
+
+volumes:
+  diario-data:
