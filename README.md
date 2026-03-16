@@ -5,8 +5,9 @@ Cliente web para jogar MUD via navegador.
 ## Estrutura atual
 
 - `v4/`: versão principal do projeto (FastAPI + frontend estático)
-- `docker-compose.yml`: composição de desenvolvimento (hot reload e volume local)
-- `docker-compose.prod.yml`: composição de produção (VPS)
+- `docker-compose.yml`: composição local simplificada (serviço `mud-html`)
+
+O projeto `shamy` é independente e deve ser operado em stack própria fora deste repositório.
 
 ## Desenvolvimento local
 
@@ -14,30 +15,31 @@ Cliente web para jogar MUD via navegador.
 docker compose up --build
 ```
 
-- Serviço: `mud-html-dev`
-- Porta: `80`
-- Usa hot reload (`--reload`) e bind mount da pasta `v4/`
+- Serviço: `mud-html`
+- Porta local: `127.0.0.1:18080`
+
+Este repositório não publica nem gerencia o `shamy`.
 
 ## Produção (VPS)
 
 Subir em modo produção:
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose up -d --build
 ```
 
 Atualizar versão na VPS (pull + rebuild + restart):
 
 ```bash
 git pull --ff-only
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose up -d --build
 ```
 
 Verificar status:
 
 ```bash
-docker compose -f docker-compose.prod.yml ps
-docker logs --tail 100 mud-html
+docker compose ps
+docker compose logs --tail 100 mud-html
 ```
 
 ## Imagem publicada

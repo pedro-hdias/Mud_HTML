@@ -29,11 +29,6 @@ HISTORY_MAX_LINES: Final[int] = 4000
 # Definir via variável de ambiente em produção. Vazio = sem proteção (dev mode).
 DEBUG_API_SECRET: Final[str] = os.environ.get("DEBUG_API_SECRET", "")
 
-# Autenticação HTTP Basic para interface web (opcional)
-# Quando WEB_AUTH_PASSWORD estiver vazio, a autenticação fica desativada.
-WEB_AUTH_USERNAME: Final[str] = os.environ.get("WEB_AUTH_USERNAME", "admin")
-WEB_AUTH_PASSWORD: Final[str] = os.environ.get("WEB_AUTH_PASSWORD", "")
-
 # Debug de áudio (logs detalhados por categoria)
 AUDIO_DEBUG_DETAILS: Final[bool] = os.environ.get("AUDIO_DEBUG_DETAILS", "0").strip().lower() in {
     "1", "true", "yes", "on"
