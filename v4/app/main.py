@@ -5,7 +5,7 @@ Bootstrap, middleware e routers.
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 
 from .ws import session_manager
 from .logger import get_logger
@@ -42,17 +42,24 @@ async def lifespan(app):
 app = FastAPI(lifespan=lifespan)
 
 # Arquivos estáticos
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/mud/static", StaticFiles(directory="static"), name="static_mud")
 
 
 @app.get("/")
 def index():
+    return RedirectResponse(url="/mud", status_code=307)
+
+
+@app.get("/mud")
+@app.get("/mud/")
+def index_mud():
     return FileResponse("static/index.html")
 
 
-# Inclui routers de domínio
+# Inclui routers de domínio sob o subpath canônico (/mud)
 app.include_router(health.router)
-app.include_router(sessions.router)
-app.include_router(logs.router)
-app.include_router(websocket.router)
-app.include_router(audio.router)
+app.include_router(health.router, prefix="/mud")
+app.include_router(sessions.router, prefix="/mud")
+app.include_router(logs.router, prefix="/mud")
+app.include_router(websocket.router, prefix="/mud")
+app.include_router(audio.router, prefix="/mud")

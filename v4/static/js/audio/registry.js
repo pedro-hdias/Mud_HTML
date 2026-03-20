@@ -5,7 +5,7 @@
  * Depende de: context.js (_MudAudio)
  */
 (function () {
-    const SOUNDS_BASE = "/static/sounds/";
+    const SOUNDS_BASE = typeof buildMudPath === "function" ? `${buildMudPath("/static/sounds")}/` : "/static/sounds/";
 
     // _registry e _registryReady ficam no namespace para permitir inspeção
     _MudAudio._registry = null;

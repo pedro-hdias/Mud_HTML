@@ -1,0 +1,26 @@
+# Controle de versão e metadados
+.git
+.gitignore
+
+# Ambientes e caches Python
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Artefatos e docs de desenvolvimento
+tests
+*.md
+
+# Configurações locais do editor
+.vscode
+.idea
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
