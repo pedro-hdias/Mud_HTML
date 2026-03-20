@@ -241,7 +241,7 @@
             </div>
             <button id="pauseBtn" aria-label="Pause log reception" aria-pressed="false">⏸️ Pause</button>
             <button id="clearBtn" class="danger" aria-label="Clear all logs">🗑️ Clear</button>
-            <a href="/" style="text-decoration: none;" aria-label="Back to main page">
+            <a href="./" style="text-decoration: none;" aria-label="Back to main page">
                 <button>🏠 Back</button>
             </a>
             </div>
@@ -361,7 +361,7 @@
                 eventSource.close();
             }
 
-            eventSource = new EventSource('/api/logs/stream');
+            eventSource = new EventSource('api/logs/stream');
 
             eventSource.onopen = () => {
                 statusIndicator.className = 'status-indicator connected';

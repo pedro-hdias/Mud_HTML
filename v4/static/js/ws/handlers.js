@@ -221,9 +221,7 @@ function handleLineMessage(payload) {
     const lineText = payload.content.toLowerCase();
     const hasInputPrompt = lineText.includes("[input]") ||
         lineText.includes("name:") ||
-        lineText.includes("login:") ||
-        lineText.includes("password:") ||
-        lineText.includes("senha:");
+        lineText.includes("login:");
 
     // Apenas chama checkAndShowLogin se detectar explicitamente um prompt de entrada
     if (hasInputPrompt) {
