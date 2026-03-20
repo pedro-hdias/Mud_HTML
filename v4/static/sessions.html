@@ -211,7 +211,7 @@
 
         async function refreshData() {
             try {
-                const response = await fetch('/api/sessions/status');
+                const response = await fetch('api/sessions/status');
                 const data = await response.json();
 
                 // Updates summary

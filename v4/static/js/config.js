@@ -12,10 +12,30 @@ function _readMeta(name, fallback) {
     return el ? el.getAttribute("content") : fallback;
 }
 
+function _detectBasePath() {
+    const path = location.pathname;
+    if (path === "/mud" || path.startsWith("/mud/")) {
+        return "/mud";
+    }
+    return "";
+}
+
+const MUD_BASE_PATH = _readMeta("mud-base-path", _detectBasePath());
+
+function buildMudPath(path) {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${MUD_BASE_PATH}${normalizedPath}`;
+}
+
 const CONFIG = {
+    BASE_PATH: MUD_BASE_PATH,
+
     // URLs e endpoints
     WS: {
-        url: _readMeta("mud-ws-url", `ws://${location.host}/ws`),
+        url: _readMeta(
+            "mud-ws-url",
+            `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${buildMudPath("/ws")}`
+        ),
         reconnectMaxAttempts: 5,
         reconnectBaseDelayMs: 1000,
         reconnectMaxDelayMs: 30000,
