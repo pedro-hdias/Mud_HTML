@@ -9,6 +9,9 @@ from .config import (
     WS_RATE_LIMIT_MAX_MESSAGES,
     WS_RATE_LIMIT_WINDOW_SECONDS,
     WS_CLOSE_CODES,
+    HISTORY_REQUEST_DEFAULT_LINES,
+    HISTORY_REQUEST_MIN_LINES,
+    HISTORY_MAX_LINES,
 )
 from .ws_messages import make_message, parse_message
 from .ws_handlers import (
@@ -86,13 +89,17 @@ async def websocket_endpoint(ws: WebSocket):
                 log_state_read(session.state, f"send_state_to_client_{public_id}")
                 await ws.send_json(make_message("state", {"value": session.state.value}))
                 
-                # Envia o histórico se existir (apenas as últimas 25 linhas)
+                # Envia o histórico se existir (apenas as últimas N linhas padrão)
                 if session.history:
-                    recent_history = session.get_recent_history(num_lines=25)
+                    recent_history = session.get_recent_history(num_lines=HISTORY_REQUEST_DEFAULT_LINES)
+                    total_lines = len(session.history.split('\n'))
+                    returned_lines = len(recent_history.split('\n')) if recent_history else 0
                     await ws.send_json(make_message("history", {
                         "content": recent_history,
                         "is_recent": True,
-                        "has_more_history": len(session.history.split('\n')) > 25
+                        "has_more_history": total_lines > returned_lines,
+                        "total_lines": total_lines,
+                        "returned_lines": returned_lines
                     }))
                 
                 # Confirma inicialização com ownership token
@@ -150,8 +157,17 @@ async def websocket_endpoint(ws: WebSocket):
                 
                 elif msg_type == "request_history":
                     # Cliente requisita histórico antigo (lazy loading)
-                    from_line_index = payload.get("from_line_index", 0)
-                    num_lines = payload.get("num_lines", 25)
+                    try:
+                        from_line_index = int(payload.get("from_line_index", 0))
+                    except (TypeError, ValueError):
+                        from_line_index = 0
+
+                    try:
+                        requested_num_lines = int(payload.get("num_lines", HISTORY_REQUEST_DEFAULT_LINES))
+                    except (TypeError, ValueError):
+                        requested_num_lines = HISTORY_REQUEST_DEFAULT_LINES
+
+                    num_lines = max(HISTORY_REQUEST_MIN_LINES, min(HISTORY_MAX_LINES, requested_num_lines))
                     history_slice = session.get_history_slice(from_line_index, num_lines)
                     await ws.send_json(make_message("history_slice", history_slice))
             

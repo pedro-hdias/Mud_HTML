@@ -55,7 +55,10 @@ const CONFIG = {
         ALLOW_LOGIN: 'mud_allow_login',
         WAS_CONNECTED: 'mud_was_connected',
         PUBLIC_ID: 'mud_public_id',
-        OWNER: 'mud_owner'
+        OWNER: 'mud_owner',
+        HISTORY_LINES: 'mud_history_lines',
+        HISTORY_DELTA: 'mud_history_delta',
+        HISTORY_LINES_MIGRATED: 'mud_history_lines_migrated'
     },
 
     // Seletores DOM
@@ -119,8 +122,18 @@ const CONFIG = {
         reconnectDelay: 1000
     },
 
+    // Quantidade de linhas por requisição de histórico antigo
+    HISTORY_REQUEST: {
+        MIN: 1,
+        MAX: 200,
+        STEP: 1,
+        DEFAULT: 50,
+        DELTA_BUTTON: 10,
+        DELTA_OPTIONS: [1, 5, 10, 20, 50]
+    },
+
     // Output
-    OUTPUT_MAX_LINES: 25,              // Linhas visíveis no buffer
+    OUTPUT_MAX_LINES: 50,              // Linhas visíveis no buffer
     OUTPUT_COMPACT_THRESHOLD: 50,      // Compactar quando exceder este número
     OUTPUT_HISTORY_MAX_LINES: 2000,
 

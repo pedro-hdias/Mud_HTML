@@ -144,15 +144,22 @@ const EventManager = Object.assign(
             // Event delegado para cliques no history-loader
             output.addEventListener("click", (e) => {
                 const loader = e.target.closest('details.history-loader');
-                if (loader) {
-                    if (loader.getAttribute('aria-disabled') === 'true') {
-                        e.preventDefault();
+                const clickedControls = e.target.closest('.history-loader-controls');
+                if (loader && !clickedControls) {
+                    const summary = e.target.closest('summary');
+                    if (!summary || summary.parentElement !== loader) {
                         return;
                     }
-                    if (loader.open) {
-                        eventsLogger.log("History loader expanded - requesting older messages");
-                        this.requestOlderHistory(loader);
+
+                    // Mantém o details sempre aberto: summary funciona como ação explícita de carregar mais.
+                    e.preventDefault();
+
+                    if (loader.dataset.hasMore !== 'true') {
+                        return;
                     }
+
+                    eventsLogger.log("History loader action - requesting older messages");
+                    this.requestOlderHistory(loader);
                 }
             }, { signal: this._abortController.signal });
         }

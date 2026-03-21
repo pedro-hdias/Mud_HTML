@@ -31,6 +31,7 @@
     --radius-md: 6px;
     --radius-lg: 8px;
     --transition-fast: all 0.2s;
+    --history-panel-reserved-height: 220px;
 }
 
 * {
@@ -84,6 +85,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
+    overflow: hidden;
 }
 
 /* Controles superiores */
@@ -97,6 +99,7 @@ body {
     box-shadow: var(--shadow-sm);
     flex-wrap: wrap;
     min-height: 56px;
+    flex-shrink: 0;
 }
 
 #controls button {
@@ -484,10 +487,44 @@ div:not(#output):not(#inputArea).show {
 }
 
 /* Output e Input */
-#output {
+#outputHeading {
+    grid-area: heading;
+    margin: 0;
+    padding: 10px 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+#mainContent {
+    display: flex;
+    flex-direction: column;
     flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#outputSection {
+    display: grid;
+    grid-template-columns: auto minmax(260px, 1fr);
+    grid-template-areas:
+        "heading loader"
+        "output output";
+    align-items: start;
+    column-gap: 12px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#output {
+    grid-area: output;
+    flex: 1;
+    min-height: 0;
     padding: 10px;
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     white-space: pre-wrap;
     font-family: 'Courier New', monospace;
     font-size: 14px;
@@ -604,13 +641,19 @@ div:not(#output):not(#inputArea).show {
 
 /* History Loader (load more on demand) */
 details.history-loader {
+    grid-area: loader;
     border: 2px solid var(--color-warning);
     border-radius: var(--radius-sm);
-    margin: 8px 0;
+    margin: 8px 10px 0 0;
     background: var(--bg-secondary);
     width: 100%;
+    min-width: 260px;
+    max-height: calc(100vh - var(--history-panel-reserved-height));
     box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
     animation: pulse-border 2s ease-in-out infinite;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 @keyframes pulse-border {
@@ -636,6 +679,58 @@ details.history-loader {
     gap: 8px;
     transition: var(--transition-fast);
     list-style: none;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.history-loader-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 12px 8px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.history-lines-slider {
+    flex: 0 0 auto;
+    width: min(280px, 100%);
+    min-width: 0;
+    max-width: 100%;
+}
+
+.history-lines-number {
+    width: 64px;
+    padding: 4px 6px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.history-lines-btn {
+    padding: 4px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.history-lines-btn:hover {
+    background: var(--bg-active);
+}
+
+.history-lines-btn:focus,
+.history-lines-number:focus,
+.history-lines-slider:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 1px;
 }
 
 .history-loader summary::-webkit-details-marker {
@@ -674,12 +769,38 @@ details.history-loader {
 
 .history-loader--disabled summary {
     cursor: default;
+    /* pointer-events mantido ativo: controles (slider, botões) devem funcionar sempre;
+       o bloqueio de "carregar mais" é feito via JS pelo check de aria-disabled */
+}
+
+.history-loader--disabled .loader-text {
     pointer-events: none;
+    opacity: 0.6;
 }
 
 .history-loader .loader-text {
     font-weight: 500;
     color: var(--text-secondary);
+}
+
+@media (max-width: 700px) {
+    #outputSection {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "heading"
+            "loader"
+            "output";
+        row-gap: 8px;
+    }
+
+    .history-loader-controls {
+        width: 100%;
+        align-items: flex-start;
+    }
+
+    .history-lines-slider {
+        width: 100%;
+    }
 }
 
 .history-loader .loader-spinner {
@@ -700,11 +821,25 @@ details.history-loader {
 }
 
 .history-loader-content {
-    max-height: 400px;
+    flex: 1 1 auto;
+    min-height: 120px;
+    max-height: calc(100vh - var(--history-panel-reserved-height) - 88px);
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     padding: 8px 12px;
     background: var(--bg-primary);
     border-top: 1px solid var(--border-color);
+}
+
+@media (max-height: 760px) {
+    :root {
+        --history-panel-reserved-height: 200px;
+    }
+
+    .history-loader-content {
+        min-height: 96px;
+    }
 }
 
 .history-loader-content .output-line {
@@ -748,6 +883,7 @@ details.history-loader {
 #inputArea {
     display: flex;
     border-top: 1px solid var(--border-color);
+    flex-shrink: 0;
 }
 
 #inputHints {
