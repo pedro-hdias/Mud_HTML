@@ -1,130 +1,129 @@
 name: Create GitHub Release on Main Merge
 
 on:
-    pull_request:
-        types: [closed]
-        branches:
-            - main
+  pull_request:
+    types: [closed]
+    branches:
+      - main
 
 jobs:
-    create-github-release:
-        # Só executa se o PR foi mergeado E veio de uma branch release/*
-        if: github.event.pull_request.merged == true && startsWith(github.event.pull_request.head.ref, 'release/')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-        steps:
-            # 1. Fazer checkout da main
-            - name: Checkout main branch
-              uses: actions/checkout@v4
-              with:
-                  ref: main
-                  fetch-depth: 0
+  deploy-vps:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conectar via SSH e executar deploy
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd ${{ vars.DEPLOY_PATH }}
 
-            # 2. Extrair informações da branch de release
-            - name: Extract version info from branch
-              id: version_info
-              run: |
-                  RELEASE_BRANCH="${{ github.event.pull_request.head.ref }}"
-                  echo "Release branch: $RELEASE_BRANCH"
+            echo "==== DEPLOY START $(date) ===="
 
-                  # Extrair a versão e data da branch (formato: release/v*.yy.mm.dd.hhmm)
-                  # Exemplo: release/v2.26.02.06.1430 -> v2.26.02.06.1430
-                  VERSION_TAG=$(echo "$RELEASE_BRANCH" | sed 's#release/##')
-                  echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
-                  echo "Version tag: $VERSION_TAG"
+            git pull origin main
 
-                  # Extrair apenas a versão (v1, v2, etc)
-                  BASE_VERSION=$(echo "$VERSION_TAG" | cut -d'.' -f1)
-                  echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
-                  echo "Base version: $BASE_VERSION"
+            docker compose down
+            docker compose build --no-cache
+            docker compose up -d
 
-            # 3. Encontrar o arquivo .zip mais recente
-            - name: Find latest zip file
-              id: find_zip
-              run: |
-                  # Procura por arquivos .zip que correspondem ao padrão mud_html_v*.*.*.*.zip
-                  # e pega o mais recente baseado no nome (que inclui a data)
-                  LATEST_ZIP=$(ls -t mud_html_${{ steps.version_info.outputs.base_version }}.*.zip 2>/dev/null | head -n1 || echo "")
+            docker image prune -af
+            docker builder prune -af
 
-                  if [ -z "$LATEST_ZIP" ]; then
-                    echo "❌ Nenhum arquivo .zip encontrado para ${{ steps.version_info.outputs.base_version }}"
-                    exit 1
-                  fi
+            echo "==== DEPLOY END $(date) ===="
 
-                  echo "zip_file=$LATEST_ZIP" >> $GITHUB_OUTPUT
-                  echo "✅ Arquivo encontrado: $LATEST_ZIP"
-                  ls -lh "$LATEST_ZIP"
+  create-github-release:
+    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
+    needs: deploy-vps
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      # 1. Fazer checkout da main
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
 
-            # 4. Verificar se a release já existe
-            - name: Check if release exists
-              id: check_release
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  RELEASE_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" 2>/dev/null && echo "true" || echo "false")
-                  echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
-                  echo "Release exists: $RELEASE_EXISTS"
+      # 2. Obter data/hora da release
+      - name: Get current datetime
+        id: date
+        run: |
+          DATE_FORMATTED=$(date -u +'%y.%m.%d.%H%M')
+          echo "date=$DATE_FORMATTED" >> $GITHUB_OUTPUT
+          echo "Current datetime: $DATE_FORMATTED"
 
-            # 5. Criar a release do GitHub com o arquivo .zip
-            - name: Create GitHub Release
-              if: steps.check_release.outputs.exists == 'false'
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  gh release create "${{ steps.version_info.outputs.version_tag }}" \
-                    "${{ steps.find_zip.outputs.zip_file }}" \
-                    --title "Release ${{ steps.version_info.outputs.version_tag }}" \
-                    --notes "## 🚀 Release ${{ steps.version_info.outputs.version_tag }}
-                    
-                    Esta release foi criada automaticamente após o merge do PR #${{ github.event.pull_request.number }}.
-                    
-                    ### 📦 Versão
-                    **${{ steps.version_info.outputs.base_version }}**
-                    
-                    ### 📅 Tag
-                    \`${{ steps.version_info.outputs.version_tag }}\`
-                    
-                    ### 📦 Arquivo
-                    \`${{ steps.find_zip.outputs.zip_file }}\`
-                    
-                    ### 🔗 Links
-                    - [Pull Request #${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})
-                    - [Branch de Release](${{ github.event.pull_request.head.ref }})
-                    
-                    ---
-                    *Esta release foi criada automaticamente pelo GitHub Actions*"
+      # 3. Identificar a pasta v* mais recente
+      - name: Identify latest version
+        id: version
+        run: |
+          LATEST_VERSION=$(ls -d v*/ 2>/dev/null | sed 's#/##' | sort -V | tail -n1 || echo "v1")
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest version found: $LATEST_VERSION"
 
-                  echo "✅ Release criada com sucesso!"
+      # 4. Montar tag da release
+      - name: Build release tag
+        id: version_info
+        run: |
+          VERSION_TAG="${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}"
+          echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+          echo "Version tag: $VERSION_TAG"
 
-            # 6. Atualizar release existente (adicionar asset se necessário)
-            - name: Update existing release
-              if: steps.check_release.outputs.exists == 'true'
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe"
+      # 5. Verificar se a release já existe
+      - name: Check if release exists
+        id: check_release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" 2>/dev/null && echo "true" || echo "false")
+          echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
+          echo "Release exists: $RELEASE_EXISTS"
 
-                  # Verifica se o asset já existe na release
-                  ASSET_EXISTS=$(gh release view "${{ steps.version_info.outputs.version_tag }}" --json assets --jq '.assets[].name' | grep -q "${{ steps.find_zip.outputs.zip_file }}" && echo "true" || echo "false")
+      # 6. Criar a release do GitHub
+      - name: Create GitHub Release
+        if: steps.check_release.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.version_info.outputs.version_tag }}" \
+            --target main \
+            --title "Release ${{ steps.version_info.outputs.version_tag }}" \
+            --notes "## 🚀 Release ${{ steps.version_info.outputs.version_tag }}
+            
+            Esta release foi criada automaticamente após o merge do PR #${{ github.event.pull_request.number }}.
+            
+            ### 📅 Tag
+            \`${{ steps.version_info.outputs.version_tag }}\`
+            
+            ### 🔗 Links
+            - [Pull Request #${{ github.event.pull_request.number }}](${{ github.event.pull_request.html_url }})
+            - [Branch de Origem](${{ github.event.pull_request.head.ref }})
+            
+            ---
+            *Esta release foi criada automaticamente pelo GitHub Actions*"
 
-                  if [ "$ASSET_EXISTS" == "false" ]; then
-                    echo "📎 Adicionando arquivo à release existente..."
-                    gh release upload "${{ steps.version_info.outputs.version_tag }}" "${{ steps.find_zip.outputs.zip_file }}" --clobber
-                    echo "✅ Arquivo adicionado à release existente!"
-                  else
-                    echo "ℹ️ Arquivo já existe na release"
-                  fi
+          echo "✅ Release criada com sucesso!"
 
-            # 7. Resumo
-            - name: Summary
-              run: |
-                  echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Arquivo**: ${{ steps.find_zip.outputs.zip_file }}" >> $GITHUB_STEP_SUMMARY
-                  echo "- **Status**: ${{ steps.check_release.outputs.exists == 'true' && 'Release atualizada' || 'Release criada' }}" >> $GITHUB_STEP_SUMMARY
-                  echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
+      # 7. Atualizar release existente
+      - name: Update existing release
+        if: steps.check_release.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe"
+
+      # 8. Resumo
+      - name: Summary
+        run: |
+          echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy VPS**: concluído antes da release" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ steps.check_release.outputs.exists == 'true' && 'Release atualizada' || 'Release criada' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
