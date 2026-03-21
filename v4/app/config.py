@@ -24,6 +24,9 @@ WS_RATE_LIMIT_WINDOW_SECONDS: Final[float] = float(os.environ.get("WS_RATE_LIMIT
 # Histórico (limites)
 HISTORY_MAX_BYTES: Final[int] = 2 * 1024 * 1024
 HISTORY_MAX_LINES: Final[int] = 4000
+HISTORY_REQUEST_DEFAULT_LINES: Final[int] = 50
+HISTORY_REQUEST_MIN_LINES: Final[int] = 1
+HISTORY_REQUEST_MAX_LINES: Final[int] = 200
 
 # Debug endpoints (secret header para proteger /api/sessions/status e /api/logs/stream)
 # Definir via variável de ambiente em produção. Vazio = sem proteção (dev mode).

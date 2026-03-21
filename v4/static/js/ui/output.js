@@ -78,6 +78,18 @@ function hasAnsiCodes(text) {
  * Mesclados em UIHelpers via Object.assign em ui/index.js.
  */
 const _UIOutputMethods = {
+    /**
+     * Remove filhos excedentes do output, preservando o history-loader.
+     */
+    _trimOutput(output, maxLines) {
+        // Conta apenas os filhos que NÃO são o history-loader
+        const children = Array.from(output.children).filter(el => !el.classList.contains('history-loader'));
+        const toRemove = children.length - maxLines;
+        for (let i = 0; i < toRemove; i++) {
+            children[i].remove();
+        }
+    },
+
     appendOutputLine(text, options = {}) {
         const output = getElement(CONFIG.SELECTORS.output);
         const announcer = getElement(CONFIG.SELECTORS.screenReaderAnnouncer);
@@ -113,12 +125,7 @@ const _UIOutputMethods = {
             announcer.appendChild(announceLine);
         }
 
-        if (output.children.length > CONFIG.OUTPUT_MAX_LINES) {
-            const toRemove = output.children.length - CONFIG.OUTPUT_MAX_LINES;
-            for (let i = 0; i < toRemove; i++) {
-                if (output.firstChild) output.removeChild(output.firstChild);
-            }
-        }
+        this._trimOutput(output, CONFIG.OUTPUT_MAX_LINES);
 
         this._scheduleScrollToBottom(output);
     },
@@ -143,12 +150,7 @@ const _UIOutputMethods = {
             }
         });
 
-        if (output.children.length > CONFIG.OUTPUT_MAX_LINES) {
-            const toRemove = output.children.length - CONFIG.OUTPUT_MAX_LINES;
-            for (let i = 0; i < toRemove; i++) {
-                if (output.firstChild) output.removeChild(output.firstChild);
-            }
-        }
+        this._trimOutput(output, CONFIG.OUTPUT_MAX_LINES);
 
         this._scheduleScrollToBottom(output);
     },
