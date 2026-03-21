@@ -11,15 +11,34 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check if develop has new commits for main
+        id: check_diff
+        run: |
+          git fetch origin main develop
+          AHEAD_COUNT=$(git rev-list --count origin/main..origin/develop)
+          echo "ahead_count=$AHEAD_COUNT" >> $GITHUB_OUTPUT
+
+          if [ "$AHEAD_COUNT" -gt 0 ]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Develop está $AHEAD_COUNT commit(s) à frente de main"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "Não há commits novos de develop para main"
+          fi
+
       # 1. Verificar se já existe PR aberto de develop para main
       - name: Check for existing PR
         id: check_pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          EXISTING_PR=$(gh pr list --head develop --base main --json number --jq '.[0].number' || echo "")
+          EXISTING_PR=$(gh pr list --repo "${{ github.repository }}" --head develop --base main --json number --jq '.[0].number' || echo "")
           if [ -n "$EXISTING_PR" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "pr_number=$EXISTING_PR" >> $GITHUB_OUTPUT
@@ -30,11 +49,12 @@ jobs:
           fi
 
       - name: Create Pull Request to Main
-        if: steps.check_pr.outputs.exists == 'false'
+        if: steps.check_pr.outputs.exists == 'false' && steps.check_diff.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh pr create \
+            --repo "${{ github.repository }}" \
             --title "Merge develop into main" \
             --body "## 🚀 PR automático de develop para main
             
@@ -56,4 +76,5 @@ jobs:
           echo "- **PR mergeado em develop**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Origem**: develop" >> $GITHUB_STEP_SUMMARY
           echo "- **Destino**: main" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ steps.check_pr.outputs.exists == 'true' && 'PR já existente' || 'PR criado' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commits develop -> main**: ${{ steps.check_diff.outputs.ahead_count }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ steps.check_pr.outputs.exists == 'true' && 'PR já existente' || (steps.check_diff.outputs.has_changes == 'true' && 'PR criado' || 'Sem alterações para PR') }}" >> $GITHUB_STEP_SUMMARY
