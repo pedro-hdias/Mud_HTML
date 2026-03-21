@@ -66,6 +66,9 @@ class SessionHistory:
                 "returned_lines": 0,
             }
 
+        from_line_index = max(0, int(from_line_index or 0))
+        num_lines = max(1, int(num_lines or 25))
+
         lines = self._content.split("\n")
         total = len(lines)
 
@@ -89,7 +92,7 @@ class SessionHistory:
             "content": "\n".join(slice_lines),
             "total_lines": total,
             "has_more": has_more,
-            "from_line_index": from_line_index,
+            "from_line_index": from_line_index + len(slice_lines),
             "returned_lines": len(slice_lines),
         }
 

@@ -9,6 +9,15 @@ const _UIHelperMethods = {
     _scrollRafId: null,
     _trimTimeoutId: null,
 
+    _clampHistoryBatchSize(value) {
+        const min = CONFIG.HISTORY_REQUEST?.MIN ?? 1;
+        const max = CONFIG.OUTPUT_HISTORY_MAX_LINES ?? 2000;
+        const fallback = CONFIG.HISTORY_REQUEST?.DEFAULT ?? 50;
+        const parsed = parseInt(value, 10);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(max, Math.max(min, parsed));
+    },
+
     /**
      * Agenda scroll para o fim do output usando requestAnimationFrame.
      * Múltiplas chamadas dentro do mesmo frame são agrupadas.
@@ -31,31 +40,136 @@ const _UIHelperMethods = {
             return;
         }
 
-        let loader = output.querySelector('.history-loader');
-        if (loader) {
+        const outputSection = document.getElementById('outputSection') || output.parentElement;
+        if (!outputSection) {
+            uiLogger.error("History loader container not found");
+            return;
+        }
+
+        const existingLoaders = Array.from(outputSection.querySelectorAll('.history-loader'));
+        if (existingLoaders.length > 0) {
+            const [primaryLoader, ...duplicateLoaders] = existingLoaders;
+            if (duplicateLoaders.length > 0) {
+                duplicateLoaders.forEach((duplicateLoader) => duplicateLoader.remove());
+                uiLogger.warn(`Removed ${duplicateLoaders.length} duplicate history loader(s)`);
+            }
+
             uiLogger.log("History loader already exists in DOM");
-            return loader;
+            return primaryLoader;
         }
 
         uiLogger.log("Creating new history loader element");
 
         loader = document.createElement('details');
         loader.className = 'history-loader';
-        loader.dataset.fromLineIndex = '25';
+        loader.open = true;
+        loader.dataset.fromLineIndex = String(CONFIG.HISTORY_REQUEST?.DEFAULT ?? 50);
         loader.dataset.hasMore = 'true';
 
+        const initialBatchSize = (typeof StorageManager !== "undefined" && typeof StorageManager.getHistoryBatchSize === "function")
+            ? StorageManager.getHistoryBatchSize()
+            : (CONFIG.HISTORY_REQUEST?.DEFAULT ?? 50);
+        loader.dataset.batchSize = String(this._clampHistoryBatchSize(initialBatchSize));
+
+        // Sincroniza buffer visível com o valor salvo imediatamente
+        CONFIG.OUTPUT_MAX_LINES = this._clampHistoryBatchSize(initialBatchSize);
+
         const summary = document.createElement('summary');
-        summary.innerHTML = '<span class="loader-text">📖 Load older messages (0 linhas)</span>';
-        summary.setAttribute('tabindex', '0');
-        summary.setAttribute('role', 'button');
-        summary.setAttribute('aria-label', 'Carregar mensagens antigas');
+        summary.className = 'history-loader-summary';
+        summary.setAttribute('aria-label', 'Load more history');
+
+        const controls = document.createElement('div');
+        controls.className = 'history-loader-controls';
+        controls.setAttribute('role', 'group');
+        controls.setAttribute('aria-label', 'Visible history lines on screen');
+
+        const decButton = document.createElement('button');
+        decButton.type = 'button';
+        decButton.className = 'history-lines-btn';
+        decButton.textContent = `-${CONFIG.HISTORY_REQUEST.DELTA_BUTTON}`;
+        decButton.setAttribute('aria-label', `Decrease visible history by ${CONFIG.HISTORY_REQUEST.DELTA_BUTTON} lines`);
+
+        const slider = document.createElement('input');
+        slider.type = 'range';
+        slider.className = 'history-lines-slider';
+        slider.min = String(CONFIG.HISTORY_REQUEST.MIN);
+        slider.max = String(CONFIG.OUTPUT_HISTORY_MAX_LINES ?? 2000);
+        slider.step = String(CONFIG.HISTORY_REQUEST.STEP);
+        slider.value = loader.dataset.batchSize;
+        slider.setAttribute('aria-label', 'Visible history lines');
+
+        const incButton = document.createElement('button');
+        incButton.type = 'button';
+        incButton.className = 'history-lines-btn';
+        incButton.textContent = `+${CONFIG.HISTORY_REQUEST.DELTA_BUTTON}`;
+        incButton.setAttribute('aria-label', `Increase visible history by ${CONFIG.HISTORY_REQUEST.DELTA_BUTTON} lines`);
+
+        const syncBatchSize = (rawValue) => {
+            const next = this._clampHistoryBatchSize(rawValue);
+            loader.dataset.batchSize = String(next);
+            slider.value = String(next);
+            if (typeof StorageManager !== "undefined" && typeof StorageManager.setHistoryBatchSize === "function") {
+                StorageManager.setHistoryBatchSize(next);
+            }
+            // Atualiza o buffer de saída visível dinamicamente
+            CONFIG.OUTPUT_MAX_LINES = next;
+
+            // Soft warning de performance (não bloqueia)
+            if (next > 200 && loader.dataset.performanceWarned !== 'true') {
+                loader.dataset.performanceWarned = 'true';
+                this.addSystemMessage('[SYSTEM] Showing more than 200 history lines may impact performance.', '#ff9800');
+            } else if (next <= 200) {
+                loader.dataset.performanceWarned = 'false';
+            }
+        };
+
+        // Impede que interação nos controles dispare o clique do summary.
+        controls.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+        // mousedown: apenas stopPropagation (sem preventDefault) para não bloquear o drag do slider.
+        controls.addEventListener('mousedown', (event) => { event.stopPropagation(); });
+        controls.addEventListener('keydown', (event) => {
+            event.stopPropagation();
+        });
+
+        decButton.addEventListener('click', () => {
+            const current = this._clampHistoryBatchSize(loader.dataset.batchSize);
+            syncBatchSize(current - (CONFIG.HISTORY_REQUEST.DELTA_BUTTON ?? 10));
+        });
+
+        incButton.addEventListener('click', () => {
+            const current = this._clampHistoryBatchSize(loader.dataset.batchSize);
+            syncBatchSize(current + (CONFIG.HISTORY_REQUEST.DELTA_BUTTON ?? 10));
+        });
+
+        slider.addEventListener('input', () => {
+            syncBatchSize(slider.value);
+        });
+
+        controls.appendChild(decButton);
+        controls.appendChild(slider);
+        controls.appendChild(incButton);
+
+        const loaderText = document.createElement('span');
+        loaderText.className = 'loader-text';
+        loaderText.textContent = 'Load more history';
+
+        summary.appendChild(loaderText);
         loader.appendChild(summary);
+        loader.appendChild(controls);
+
+        syncBatchSize(loader.dataset.batchSize);
 
         const content = document.createElement('div');
         content.className = 'history-loader-content';
         loader.appendChild(content);
 
-        output.insertBefore(loader, output.firstChild);
+        if (outputSection) {
+            outputSection.insertBefore(loader, output);
+        } else {
+            output.insertBefore(loader, output.firstChild);
+        }
 
         uiLogger.log("✅ History loader created and inserted:", {
             loader,
@@ -114,7 +228,7 @@ const _UIHelperMethods = {
             lineEl.textContent = line;
             lineEl.setAttribute('tabindex', '0');
             lineEl.setAttribute('role', 'article');
-            lineEl.setAttribute('aria-label', `História: ${line.substring(0, 50)}`);
+            lineEl.setAttribute('aria-label', `History: ${line.substring(0, 50)}`);
             content.insertBefore(lineEl, content.firstChild);
         });
 
@@ -122,7 +236,10 @@ const _UIHelperMethods = {
         const textSpan = loader.querySelector('.loader-text');
         if (textSpan) {
             const count = content.querySelectorAll('.' + CONFIG.CLASSES.outputLine).length;
-            textSpan.textContent = `📖 Load older messages (${count} linhas)`;
+            const total = parseInt(loader.dataset.totalLines || '0', 10);
+            textSpan.textContent = total > 0
+                ? `Load more history (${count}/${total})`
+                : `Load more history (${count})`;
             uiLogger.log(`Updated history loader counter: ${count} lines`);
         }
     },
@@ -137,16 +254,22 @@ const _UIHelperMethods = {
         loader.dataset.hasMore = hasMore ? 'true' : 'false';
         loader.dataset.fromLineIndex = fromLineIndex;
 
+        const textSpan = loader.querySelector('.loader-text');
+        const summary = loader.querySelector('summary');
+
         if (!hasMore) {
-            const summary = loader.querySelector('summary');
-            if (summary) {
-                summary.textContent = '🎯 Todo o histórico carregado';
+            if (textSpan) {
+                // Se fromLineIndex === 0 e não há conteúdo carregado ainda, é o estado inicial
+                const hasLoadedContent = loader.querySelectorAll('.output-line').length > 0;
+                textSpan.textContent = hasLoadedContent
+                    ? 'Load more history (all loaded)'
+                    : 'Load more history';
             }
             loader.classList.add('history-loader--disabled');
-            loader.setAttribute('aria-disabled', 'true');
+            if (summary) summary.setAttribute('aria-disabled', 'true');
         } else {
             loader.classList.remove('history-loader--disabled');
-            loader.removeAttribute('aria-disabled');
+            if (summary) summary.setAttribute('aria-disabled', 'false');
         }
     },
 

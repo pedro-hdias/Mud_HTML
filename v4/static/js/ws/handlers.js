@@ -69,6 +69,17 @@ function handleInitOkMessage(payload) {
             }
         }, CONFIG.WS.backendReadyDelayMs);
     }
+
+    // Garante que o loader de histórico existe no output, mesmo sem histórico ainda.
+    // Só cria em estado desabilitado se o loader ainda não foi configurado pela mensagem de histórico.
+    const output = getElement(CONFIG.SELECTORS.output);
+    if (output) {
+        const existingLoader = output.querySelector('.history-loader');
+        if (!existingLoader || existingLoader.dataset.hasMore !== 'true') {
+            UIHelpers.ensureHistoryLoader(output);
+            UIHelpers.updateHistoryLoaderState(output, false, 0);
+        }
+    }
 }
 
 /**
@@ -134,7 +145,9 @@ function handleErrorMessage(payload) {
  */
 function handleHistoryMessage(payload) {
     const isRecent = payload.is_recent || false;
-    const hasMoreHistory = payload.has_more_history || false || CONFIG.DEBUG_FORCE_HISTORY_BUTTON;
+    const totalLines = parseInt(payload.total_lines || "0", 10);
+    const returnedLines = parseInt(payload.returned_lines || "0", 10);
+    const hasMoreHistory = (payload.has_more_history || false || CONFIG.DEBUG_FORCE_HISTORY_BUTTON);
 
     wsLogger.debug(`📜 Histórico recebido:`, {
         isRecent,
@@ -153,12 +166,13 @@ function handleHistoryMessage(payload) {
             const output = getElement(CONFIG.SELECTORS.output);
             if (output) {
                 const loader = UIHelpers.ensureHistoryLoader(output);
+                loader.dataset.totalLines = String(totalLines);
                 wsLogger.debug("📦 Elemento history loader:", loader);
                 wsLogger.debug("📍 Loader no DOM:", document.contains(loader));
                 wsLogger.debug("👁️ Visibilidade do loader:", window.getComputedStyle(loader).display);
                 wsLogger.debug("📏 Posição do loader:", loader.getBoundingClientRect());
                 wsLogger.debug("🔍 Scroll do output:", { scrollTop: output.scrollTop, scrollHeight: output.scrollHeight, clientHeight: output.clientHeight });
-                UIHelpers.updateHistoryLoaderState(output, true, 25);
+                UIHelpers.updateHistoryLoaderState(output, hasMoreHistory, returnedLines || (CONFIG.HISTORY_REQUEST?.DEFAULT ?? 50));
             } else {
                 wsLogger.error("❌ Elemento output não encontrado!");
             }
@@ -194,6 +208,10 @@ function handleHistorySliceMessage(payload) {
     // Histórico sob demanda é sempre processado como não-recente
     const output = getElement(CONFIG.SELECTORS.output);
     if (output) {
+        const loader = UIHelpers.ensureHistoryLoader(output);
+        if (loader) {
+            loader.dataset.totalLines = String(payload.total_lines || 0);
+        }
         UIHelpers.appendHistoryToLoader(output, payload.content || "");
         UIHelpers.updateHistoryLoaderState(output, payload.has_more || false, payload.from_line_index || 0);
     }

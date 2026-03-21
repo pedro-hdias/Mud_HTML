@@ -175,6 +175,60 @@ const StorageManager = {
         return this.getItem(CONFIG.STORAGE_KEYS.ALLOW_LOGIN) === 'true';
     },
 
+    setHistoryBatchSize(value) {
+        const parsed = parseInt(value, 10);
+        if (!Number.isFinite(parsed)) return;
+
+        const min = CONFIG.HISTORY_REQUEST?.MIN ?? 1;
+        const max = CONFIG.HISTORY_REQUEST?.MAX ?? 200;
+        const clamped = Math.min(max, Math.max(min, parsed));
+        this.setItem(CONFIG.STORAGE_KEYS.HISTORY_LINES, clamped.toString());
+    },
+
+    getHistoryBatchSize() {
+        const raw = this.getItem(CONFIG.STORAGE_KEYS.HISTORY_LINES);
+        const parsed = parseInt(raw || "", 10);
+        if (!Number.isFinite(parsed)) {
+            return CONFIG.HISTORY_REQUEST?.DEFAULT ?? 50;
+        }
+
+        // Migração única: antigo default persistido como 25 passa a 50.
+        const migrated = this.getItem(CONFIG.STORAGE_KEYS.HISTORY_LINES_MIGRATED) === 'true';
+        const newDefault = CONFIG.HISTORY_REQUEST?.DEFAULT ?? 50;
+        if (!migrated && parsed === 25 && newDefault === 50) {
+            this.setItem(CONFIG.STORAGE_KEYS.HISTORY_LINES, String(newDefault));
+            this.setItem(CONFIG.STORAGE_KEYS.HISTORY_LINES_MIGRATED, 'true');
+            return newDefault;
+        }
+
+        if (!migrated) {
+            this.setItem(CONFIG.STORAGE_KEYS.HISTORY_LINES_MIGRATED, 'true');
+        }
+
+        const min = CONFIG.HISTORY_REQUEST?.MIN ?? 1;
+        const max = CONFIG.HISTORY_REQUEST?.MAX ?? 200;
+        return Math.min(max, Math.max(min, parsed));
+    },
+
+    setHistoryDelta(value) {
+        const parsed = parseInt(value, 10);
+        if (!Number.isFinite(parsed)) return;
+
+        const options = CONFIG.HISTORY_REQUEST?.DELTA_OPTIONS ?? [1, 5, 10, 20, 50];
+        const safe = options.includes(parsed) ? parsed : (CONFIG.HISTORY_REQUEST?.DELTA_BUTTON ?? 10);
+        this.setItem(CONFIG.STORAGE_KEYS.HISTORY_DELTA, safe.toString());
+    },
+
+    getHistoryDelta() {
+        const raw = this.getItem(CONFIG.STORAGE_KEYS.HISTORY_DELTA);
+        const parsed = parseInt(raw || "", 10);
+        const options = CONFIG.HISTORY_REQUEST?.DELTA_OPTIONS ?? [1, 5, 10, 20, 50];
+        if (!Number.isFinite(parsed) || !options.includes(parsed)) {
+            return CONFIG.HISTORY_REQUEST?.DELTA_BUTTON ?? 10;
+        }
+        return parsed;
+    },
+
     setWasConnected(value) {
         this.setItem(CONFIG.STORAGE_KEYS.WAS_CONNECTED, value.toString());
     },

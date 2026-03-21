@@ -160,6 +160,10 @@ const _EventActionsMethods = {
 
         const fromLineIndex = parseInt(loaderElement.dataset.fromLineIndex || "0");
         const hasMore = loaderElement.dataset.hasMore === 'true';
+        const requestBatchSize = parseInt(
+            loaderElement.dataset.batchSize || String(CONFIG.HISTORY_REQUEST.DEFAULT),
+            10
+        );
 
         if (!hasMore) {
             eventsLogger.log("No more history available");
@@ -167,10 +171,10 @@ const _EventActionsMethods = {
         }
 
         if (typeof sendMessage === "function") {
-            eventsLogger.log(`Requesting history from line ${fromLineIndex}`);
+            eventsLogger.log(`Requesting history from line ${fromLineIndex} with request batch size ${requestBatchSize}`);
             sendMessage("request_history", {
                 from_line_index: fromLineIndex,
-                num_lines: 25
+                num_lines: requestBatchSize
             });
 
             UIHelpers.setHistoryLoading(getElement(CONFIG.SELECTORS.output), true);
