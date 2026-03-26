@@ -1,5 +1,5 @@
 /**
- * storage.js - Gerenciamento de armazenamento
+ * storage/index.js - Gerenciamento de armazenamento
  * Abstração para cookies e localStorage
  */
 
@@ -119,36 +119,20 @@ const StorageManager = {
             if (cookieCreds) {
                 raw = JSON.parse(cookieCreds);
             } else {
-                // Depois localStorage
                 const localCreds = this.getItem(CONFIG.STORAGE_KEYS.CREDENTIALS);
                 if (localCreds) {
                     raw = JSON.parse(localCreds);
                 }
             }
+
             if (!raw) return null;
 
-            // Formato v2 (ofuscado)
-            if (raw._v === 2) {
-                const username = this._deobfuscate(raw.u);
-                const password = this._deobfuscate(raw.p);
-                if (!username || !password) {
-                    storageLogger.error("Failed to deobfuscate credentials");
-                    this.clearCredentials();
-                    return null;
-                }
-                return { username, password };
-            }
-
-            // Formato legado (texto puro) — migra automaticamente
-            if (raw.username && raw.password) {
-                storageLogger.log("Migrating legacy credentials to obfuscated format");
-                this.saveCredentials(raw.username, raw.password, !!this.getCookie(CONFIG.STORAGE_KEYS.CREDENTIALS));
-                return { username: raw.username, password: raw.password };
-            }
-
-            return null;
+            return {
+                username: this._deobfuscate(raw.u),
+                password: this._deobfuscate(raw.p)
+            };
         } catch (e) {
-            storageLogger.error("Error parsing credentials", e);
+            storageLogger.error("Error getting credentials", e);
             return null;
         }
     },
@@ -292,5 +276,3 @@ const StorageManager = {
         storageLogger.log("Session fully cleared (ID + token)");
     }
 };
-
-

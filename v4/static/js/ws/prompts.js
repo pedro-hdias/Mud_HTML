@@ -1,5 +1,5 @@
 /**
- * prompts.js - Detecção e processamento de prompts
+ * ws/prompts.js - Detecção e processamento de prompts
  * Identifica prompts de confirmação e constrói mensagens
  */
 
