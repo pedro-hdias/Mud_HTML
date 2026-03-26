@@ -160,9 +160,8 @@
     <!-- Important loading order: dependencies first -->
     <script src="/mud/static/js/logger.js"></script>
     <script src="/mud/static/js/config.js"></script>
-    <script src="/mud/static/js/storage.js"></script>
-    <script src="/mud/static/js/prompts.js"></script>
-    <script src="/mud/static/js/modals.js"></script>
+    <!-- Módulo de armazenamento (storage/) -->
+    <script src="/mud/static/js/storage/index.js"></script>
     <!-- Módulos de estado (state/) -->
     <script src="/mud/static/js/state/store.js"></script>
     <script src="/mud/static/js/state/mutations.js"></script>
@@ -179,11 +178,10 @@
     <script src="/mud/static/js/events/actions.js"></script>
     <script src="/mud/static/js/events/bindings.js"></script>
     <!-- Módulos de UI (ui/) -->
-    <script src="/mud/static/js/ui/dom.js"></script>
     <script src="/mud/static/js/ui/output.js"></script>
     <script src="/mud/static/js/ui/status.js"></script>
     <script src="/mud/static/js/ui/helpers.js"></script>
-    <script src="/mud/static/js/ui/accessibility.js"></script>
+    <script src="/mud/static/js/ui/modals.js"></script>
     <script src="/mud/static/js/ui/index.js"></script>
     <!-- Modularized audio package (audio/) -->
     <script src="/mud/static/js/audio/context.js"></script>
@@ -193,13 +191,14 @@
     <script src="/mud/static/js/audio/controls.js"></script>
     <script src="/mud/static/js/audio/state.js"></script>
     <script src="/mud/static/js/audio/index.js"></script>
-    <script src="/mud/static/js/sound-handler.js"></script>
-    <script src="/mud/static/js/volume-control.js"></script>
-    <script src="/mud/static/js/audio-menu-control.js?v=20260303-1"></script>
+    <script src="/mud/static/js/audio/handler.js"></script>
+    <script src="/mud/static/js/audio/volume-ui.js"></script>
+    <script src="/mud/static/js/audio/menu-ui.js"></script>
     <!-- Pacote WebSocket modularizado (ws/) -->
     <script src="/mud/static/js/ws/protocol.js"></script>
     <script src="/mud/static/js/ws/command-queue.js"></script>
     <script src="/mud/static/js/ws/reconnect.js"></script>
+    <script src="/mud/static/js/ws/prompts.js"></script>
     <script src="/mud/static/js/ws/handlers.js"></script>
     <script src="/mud/static/js/ws/session-init.js"></script>
     <script src="/mud/static/js/ws/transport.js"></script>

@@ -1,6 +1,6 @@
 /**
- * volume-control.js — Controle de volume mestre global via slider
- * 
+ * audio/volume-ui.js — Controle de volume mestre global via slider
+ *
  * Gerencia o slider de volume na UI, sincroniza com _MudAudio.volume()
  * e persiste a preferência no localStorage.
  */

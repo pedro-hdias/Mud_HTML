@@ -1,5 +1,5 @@
 /**
- * sound-handler.js - Gerenciador de eventos de som do backend
+ * audio/handler.js - Gerenciador de eventos de som do backend
  * Processa eventos emitidos pelo motor de regras Prometheus e executa via MudAudio
  */
 
@@ -185,5 +185,5 @@ const SoundHandler = (() => {
     };
 })();
 
-// Expõe o SoundHandler globalmente para que ws.js possa acessá-lo
+// Expõe o SoundHandler globalmente para que ws/handlers.js possa acessá-lo
 window.SoundHandler = SoundHandler;
