@@ -7,8 +7,8 @@ import random
 import unittest
 from unittest.mock import MagicMock, patch
 
-from app.sounds.interpreter import SendInterpreter
-from app.sounds.state import _Settings, _ConfigTable
+from app.interpreter import SendInterpreter
+from app.interpreter.state import _Settings, _ConfigTable
 
 
 # ──────────────────────────────────────────────
@@ -202,7 +202,7 @@ class TestControlStructures:
         interp.run(code)
         assert interp.get_rewritten_text() == "ramo_b"
 
-    @patch("app.sounds.interpreter.get_registry")
+    @patch("app.interpreter.get_registry")
     def test_for_executa_n_vezes(self, mock_get_registry):
         """Bloco for deve executar o número correto de iterações."""
         mock_get_registry.return_value = _mock_registry(
@@ -257,7 +257,7 @@ class TestControlStructures:
 class TestSupportedFunctions:
     """Testa PlayGlobalSound, PlayCombatSound, StopSound e Note."""
 
-    @patch("app.sounds.interpreter.get_registry")
+    @patch("app.interpreter.get_registry")
     def test_play_global_sound_adiciona_evento(self, mock_get_registry):
         """PlayGlobalSound deve adicionar evento de play na lista de eventos."""
         mock_get_registry.return_value = _mock_registry(
@@ -270,7 +270,7 @@ class TestSupportedFunctions:
         assert events[0]["action"] == "play"
         assert events[0]["channel"] == "global"
 
-    @patch("app.sounds.interpreter.get_registry")
+    @patch("app.interpreter.get_registry")
     def test_play_combat_sound_adiciona_evento(self, mock_get_registry):
         """PlayCombatSound deve adicionar evento de play com channel=combat."""
         mock_get_registry.return_value = _mock_registry(
@@ -304,7 +304,7 @@ class TestSupportedFunctions:
         interp.run('Note("Você viu: %0")')
         assert interp.get_rewritten_text() == "Você viu: linha original"
 
-    @patch("app.sounds.interpreter.get_registry")
+    @patch("app.interpreter.get_registry")
     def test_play_global_sound_path_no_evento(self, mock_get_registry):
         """O path normalizado deve aparecer no evento gerado."""
         normalizado = "General/Misc/Test.ogg"
@@ -315,7 +315,7 @@ class TestSupportedFunctions:
         interp.run(f'PlayGlobalSound("{normalizado}")')
         assert interp._events[0]["path"] == normalizado
 
-    @patch("app.sounds.interpreter.get_registry")
+    @patch("app.interpreter.get_registry")
     def test_play_global_sound_path_nao_encontrado_sem_fallback_descarta_evento(self, mock_get_registry):
         """Quando path não existe no registry E fallback também não existe,
         nenhum evento é emitido (comportamento correto: não enviar path=None ao cliente).

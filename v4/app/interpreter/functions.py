@@ -4,7 +4,7 @@ tratamento de Note() e DoAfterSpecial().
 """
 from typing import Any, Callable, Dict, List, Optional
 
-from ...logger import get_logger
+from ..logger import get_logger
 from .evaluator import split_args
 
 logger = get_logger(__name__)
