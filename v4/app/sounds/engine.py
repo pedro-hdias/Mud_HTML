@@ -9,9 +9,9 @@ from typing import Dict, List, Any, Optional
 from .models import TriggerRule, SoundEvent
 from .parser import load_rules, clear_rules_cache
 from .matcher import compile_rule_matcher, normalize_line
-from .interpreter import SendInterpreter
+from ..interpreter import SendInterpreter
 from .registry import get_registry
-from .state import _Settings, _ConfigTable
+from ..interpreter.state import _Settings, _ConfigTable
 from .core import (
     InternalTriggerRule,
     RuleActionExecutor,

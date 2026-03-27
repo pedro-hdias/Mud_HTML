@@ -4,7 +4,7 @@ Validação de caminhos de som e resolução via registry.
 from pathlib import Path
 from typing import Callable, Optional
 
-from ...logger import get_logger
+from ..logger import get_logger
 
 
 def _get_registry():
@@ -12,10 +12,10 @@ def _get_registry():
     Wrapper interno para obtenção do registry com suporte a patching de testes.
 
     As funções deste módulo fazem lookup do registry em tempo de execução através
-    do namespace do pacote `app.sounds.interpreter`, permitindo que testes usem
-    `@patch("app.sounds.interpreter.get_registry", ...)` para injetar mocks.
+    do namespace do pacote `app.interpreter`, permitindo que testes usem
+    `@patch("app.interpreter.get_registry", ...)` para injetar mocks.
     """
-    import app.sounds.interpreter as _interp_pkg
+    import app.interpreter as _interp_pkg
     return _interp_pkg.get_registry()
 
 logger = get_logger(__name__)

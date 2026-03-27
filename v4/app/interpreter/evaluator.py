@@ -4,8 +4,8 @@ Avaliação de expressões e condições Lua para o interpretador send.
 import re
 from typing import Any, List
 
-from ..lua import to_number, lua_match
-from ...logger import get_logger
+from .lua import to_number, lua_match
+from ..logger import get_logger
 from .resolver import resolve_vars, strip_quotes
 
 logger = get_logger(__name__)
