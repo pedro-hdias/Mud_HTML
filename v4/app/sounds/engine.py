@@ -5,7 +5,6 @@ Motor de sons do Prometheus - orquestrador principal.
 import re
 import random
 from typing import Dict, List, Any, Optional
-from pathlib import Path
 
 from .models import TriggerRule, SoundEvent
 from .parser import load_rules, clear_rules_cache
@@ -13,16 +12,110 @@ from .matcher import compile_rule_matcher, normalize_line
 from .interpreter import SendInterpreter
 from .registry import get_registry
 from .state import _Settings, _ConfigTable
+from .core import (
+    InternalTriggerRule,
+    RuleActionExecutor,
+    RuleMatch,
+    RuleMatcher,
+    RuleExecutionResult,
+    RuleSource,
+)
 from ..config import AUDIO_DEBUG_DETAILS
 from ..logger import get_logger
 
 logger = get_logger(__name__)
 
 
+class ParserRuleSource:
+    """Adapter padrão para carregar regras via parser existente."""
+
+    def load_rules(self) -> List[InternalTriggerRule]:
+        legacy_rules = load_rules()
+        return [InternalTriggerRule.from_trigger_rule(rule) for rule in legacy_rules]
+
+
+class SendInterpreterActionExecutor:
+    """Adapter padrão para executar send_text via SendInterpreter existente."""
+
+    def __init__(self, settings: _Settings, config_table: _ConfigTable):
+        self._settings = settings
+        self._config_table = config_table
+
+    def execute(
+        self,
+        rule: InternalTriggerRule,
+        captures: List[str],
+        variables: Dict[str, Any],
+        rng: random.Random,
+    ) -> RuleExecutionResult:
+        if not rule.send_text:
+            return RuleExecutionResult(events=[], rewritten_text=None)
+
+        interpreter = SendInterpreter(
+            captures=captures,
+            variables=variables,
+            settings=self._settings,
+            config_table=self._config_table,
+            rng=rng,
+        )
+
+        sound_events = interpreter.run(rule.send_text)
+        rewritten_text = interpreter.get_rewritten_text()
+
+        events = [
+            {
+                "action": evt.get("action"),
+                "channel": evt.get("channel"),
+                "path": evt.get("path"),
+                "delay_ms": evt.get("delay_ms", 0),
+                "pan": evt.get("pan"),
+                "volume": evt.get("volume", 100),
+                "sound_id": evt.get("sound_id"),
+                "target": evt.get("target"),
+            }
+            for evt in sound_events
+        ]
+
+        return RuleExecutionResult(events=events, rewritten_text=rewritten_text)
+
+
+class RegexRuleMatcher:
+    """Matcher padrão baseado em regex/wildcard, com cache por regra."""
+
+    def __init__(self) -> None:
+        self._matcher_cache: Dict[int, re.Pattern] = {}
+
+    def get_matches(self, rule: InternalTriggerRule, normalized_line: str) -> List[RuleMatch]:
+        rule_id = id(rule)
+        matcher = self._matcher_cache.get(rule_id)
+
+        if not matcher:
+            matcher = compile_rule_matcher(rule)
+            if matcher:
+                self._matcher_cache[rule_id] = matcher
+            else:
+                return []
+
+        return [
+            RuleMatch(captures=[match.group(0)] + list(match.groups()))
+            for match in matcher.finditer(normalized_line)
+        ]
+
+    def clear_cache(self) -> None:
+        self._matcher_cache.clear()
+
+
 class PrometheusSoundEngine:
     """Interpreta regras do Prometheus.xml e gera eventos de som."""
     
-    def __init__(self, rules: List[TriggerRule] = None, seed: int = None):
+    def __init__(
+        self,
+        rules: List[TriggerRule] = None,
+        seed: int = None,
+        rule_source: RuleSource = None,
+        action_executor: RuleActionExecutor = None,
+        rule_matcher: RuleMatcher = None,
+    ):
         """
         Inicializa motor com regras e RNG.
         
@@ -30,27 +123,31 @@ class PrometheusSoundEngine:
             rules: Lista de TriggerRule (se None, carrega do XML)
             seed: Seed para RNG
         """
-        self._rules = rules or load_rules()
+        if rules is not None:
+            self._rules = [InternalTriggerRule.from_trigger_rule(rule) for rule in rules]
+        else:
+            source = rule_source or ParserRuleSource()
+            self._rules = source.load_rules()
         self._rng = random.Random(seed)
         self._settings = _Settings()
         self._config_table = _ConfigTable(self._settings)
+        self._action_executor = action_executor or SendInterpreterActionExecutor(
+            settings=self._settings,
+            config_table=self._config_table,
+        )
+        self._rule_matcher = rule_matcher or RegexRuleMatcher()
         self._last_line = ""
         self._registry = get_registry()
         self._last_should_omit = False  # Flag de omissão da última linha processada
         self._last_rewritten_text: Optional[str] = None  # Texto reescrito da última linha
-        
-        # 💾 CACHE: Armazenar matchers compilados para evitar recompilação
-        self._matcher_cache = {}
-        self._compilation_times = {}
         
         logger.info(f"Motor de sons inicializado com {len(self._rules)} regras, seed={seed}")
         
         # Pré-compila todos as regras e armazena em cache
         compiled_count = 0
         for rule in self._rules:
-            matcher = compile_rule_matcher(rule)
-            if matcher:
-                self._matcher_cache[id(rule)] = matcher
+            self._rule_matcher.get_matches(rule, "")
+            if rule.compiled is not None:
                 compiled_count += 1
         
         logger.info(f"✓ Cache de matchers compilados: {compiled_count}/{len(self._rules)} regras")
@@ -80,23 +177,11 @@ class PrometheusSoundEngine:
         # Normalize once at the beginning
         normalized = normalize_line(line)
         
-        for rule_idx, rule in enumerate(self._rules):
+        for rule in self._rules:
             if not rule.enabled or not rule.match:
                 continue
             
-            # 💾 CACHE: Usar matcher compilado em cache em vez de recompilar
-            rule_id = id(rule)
-            matcher = self._matcher_cache.get(rule_id)
-            
-            if not matcher:
-                # Fallback: compilar sob demanda se não em cache
-                matcher = compile_rule_matcher(rule)
-                if matcher:
-                    self._matcher_cache[rule_id] = matcher
-                else:
-                    continue
-            
-            matches = list(matcher.finditer(normalized))
+            matches = self._rule_matcher.get_matches(rule, normalized)
             
             if not matches:
                 continue
@@ -108,9 +193,8 @@ class PrometheusSoundEngine:
                 self._last_should_omit = True
             
             # Processa cada match
-            for match_idx, match in enumerate(matches):
-                captures = [match.group(0)] + list(match.groups())
-                rule_events, rewritten_text = self._execute_rule(rule, captures)
+            for matched in matches:
+                rule_events, rewritten_text = self._execute_rule(rule, matched.captures)
                 events.extend(rule_events)
                 
                 # Se há texto reescrito, armazena
@@ -120,8 +204,6 @@ class PrometheusSoundEngine:
             # Comportamento compatível com MUSHclient:
             # por padrão, para no primeiro trigger que casar, a menos que
             # keep_evaluating esteja explicitamente habilitado.
-            if not rule.keep_evaluating:
-                break
             if not rule.keep_evaluating:
                 break
         
@@ -136,45 +218,21 @@ class PrometheusSoundEngine:
         """Retorna o texto reescrito da última linha processada (via Note())."""
         return self._last_rewritten_text
 
-    def _execute_rule(self, rule: TriggerRule, captures: List[str]) -> tuple:
+    def _execute_rule(self, rule: InternalTriggerRule, captures: List[str]) -> tuple:
         """
         Executa send block de uma regra.
         
         Returns:
             Tupla (events, rewritten_text)
         """
-        if not rule.send_text:
-            return [], None
-        
         variables = self._init_variables(captures)
-        
-        interpreter = SendInterpreter(
+        result = self._action_executor.execute(
+            rule=rule,
             captures=captures,
             variables=variables,
-            settings=self._settings,
-            config_table=self._config_table,
             rng=self._rng,
         )
-        
-        sound_events = interpreter.run(rule.send_text)
-        rewritten_text = interpreter.get_rewritten_text()
-        
-        # Converte para dicts para serialização JSON
-        events = [
-            {
-                "action": evt.get("action"),
-                "channel": evt.get("channel"),
-                "path": evt.get("path"),
-                "delay_ms": evt.get("delay_ms", 0),
-                "pan": evt.get("pan"),
-                "volume": evt.get("volume", 100),
-                "sound_id": evt.get("sound_id"),
-                "target": evt.get("target"),
-            }
-            for evt in sound_events
-        ]
-        
-        return events, rewritten_text
+        return result.events, result.rewritten_text
 
     def _init_variables(self, captures: List[str]) -> Dict[str, Any]:
         """Inicializa variáveis para SendInterpreter."""
@@ -236,7 +294,7 @@ class PrometheusSoundEngine:
         for rule in self._rules:
             rule.compiled = None
         clear_rules_cache()
-        self._matcher_cache.clear()
+        self._rule_matcher.clear_cache()
         logger.info("✓ Cache de matchers limpo")
     
     # ========== MÉTRICAS DE PERFORMANCE ==========
