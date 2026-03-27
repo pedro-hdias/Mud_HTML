@@ -98,16 +98,16 @@ const _EventActionsMethods = {
             return;
         }
 
-        if (typeof getLastCommandSent === "function") {
-            const lastCommand = getLastCommandSent();
-            if (lastCommand) {
-                eventsLogger.log("Resending last command", lastCommand);
-                sendCommand(lastCommand);
-                input.focus();
-                UIHelpers.flashInput();
-                UIHelpers.addSystemMessage(`[resend] ${lastCommand}`, "#888");
-                return;
-            }
+        // Reusa o último texto bruto digitado (pode conter ";" para macros)
+        const lastRawInput = this._commandHistory.length > 0 ? this._commandHistory[0] : null;
+        if (lastRawInput) {
+            eventsLogger.log("Resending last raw input", lastRawInput);
+            this._pushCommandHistory(lastRawInput);
+            sendCommand(lastRawInput);
+            input.focus();
+            UIHelpers.flashInput();
+            UIHelpers.addSystemMessage(`[resend] ${lastRawInput}`, "#888");
+            return;
         }
 
         eventsLogger.warn("Send blocked: empty command");
