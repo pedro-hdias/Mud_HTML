@@ -54,13 +54,15 @@ async def handle_login(session: MudSession, ws: WebSocket, public_id: str, paylo
     """Processes login credentials"""
     log_state_read(session.state, f"login_request_{public_id}")
     if session.writer and session.state in [ConnectionState.CONNECTED, ConnectionState.AWAITING_LOGIN]:
-        username: str = payload.get("username", "")
-        password: str = payload.get("password", "")
+        username = payload.get("username", "")
+        password = payload.get("password", "")
+
+        if not isinstance(username, str) or not isinstance(password, str):
+            logger.warning(f"Session {public_id}: Invalid login payload types")
+            return
 
         # Envia sequência de login
         try:
-            await session.send_to_mud(b"p\n")
-            await asyncio.sleep(0.1)
             await session.send_to_mud((username + "\n").encode())
             await asyncio.sleep(0.1)
             await session.send_to_mud((password + "\n").encode())
