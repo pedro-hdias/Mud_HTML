@@ -1,5 +1,5 @@
 /**
- * modals.js - Gerenciamento de modais
+ * ui/modals.js - Gerenciamento de modais
  * Controla modais de login e confirmação
  */
 

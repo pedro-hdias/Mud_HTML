@@ -1,6 +1,6 @@
 /**
- * audio-menu-control.js — Menu de controle de áudio avançado
- * 
+ * audio/menu-ui.js — Menu de controle de áudio avançado
+ *
  * Gerencia:
  * - Toggle Auto-play sounds
  * - Mute/Unmute rápido
