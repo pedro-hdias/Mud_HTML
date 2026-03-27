@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from ...logger import get_logger
+from ..logger import get_logger
 from .control_flow import collect_block, is_active
 from .evaluator import eval_condition, eval_value, split_args, split_concat
 from .functions import emit_sound_event, handle_do_after_special, handle_note, next_sound_id
@@ -292,7 +292,7 @@ class SendInterpreter:
                 logger.warning(f"[PlaySound] ✗ Arquivo não encontrado: '{path}'")
 
                 # Sugerir arquivos similares
-                import app.sounds.interpreter as _interp_pkg
+                import app.interpreter as _interp_pkg
                 registry = _interp_pkg.get_registry()
                 similar = registry.find_similar(path, max_results=3)
                 if similar:
