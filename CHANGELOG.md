@@ -1,5 +1,18 @@
 # Changelog
 
+## v4.0 (2026-04-15)
+
+### Alterado (breaking change)
+- estrutura `v4/` foi segregada em duas raízes independentes: `backend/` (FastAPI, testes e dependências) e `frontend/` (HTML/CSS/JS/assets)
+- `docker-compose.yml` foi dividido em dois serviços (`mud-backend` e `mud-frontend`) para permitir desenvolvimento e rebuild separados por camada
+- backend deixou de servir arquivos estáticos diretamente; o frontend passa a ser servido por um contêiner Nginx dedicado, com proxy para API e WebSocket do backend
+- rotas de páginas de debug no backend (`/logs`, `/sessions`, `/audio`) foram ajustadas para redirecionamento, mantendo endpoints de API em funcionamento
+- catalogação de sons no backend passou a aceitar diretório configurável por `SOUND_REGISTRY_DIR`, com fallback para a nova estrutura
+- versionamento de release no GitHub Actions passou a usar o arquivo `VERSION`, removendo dependência de pastas `v*`
+
+### Removido
+- pasta legada `v4/` removida completamente do repositório
+
 ## v3.3 (2026-03-06)
 
 ### Corrigido (issue #45 — the eternal connection)
