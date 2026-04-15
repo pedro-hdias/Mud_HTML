@@ -47,7 +47,7 @@ async def audio_diagnostic():
         logger.exception(f"Erro no diagnóstico de áudio: {e}")
         return {
             "status": "ERROR",
-            "error": str(e),
+            "error": "Erro interno ao gerar diagnóstico de áudio.",
         }
 
 
@@ -75,7 +75,7 @@ async def audio_performance_metrics():
         logger.exception(f"Erro ao carregar métricas: {e}")
         return {
             "status": "ERROR",
-            "error": str(e),
+            "error": "Erro interno ao carregar métricas de áudio.",
         }
 
 
@@ -99,5 +99,5 @@ async def validate_sound(sound_path: str):
         return {
             "requested": sound_path,
             "valid": False,
-            "error": str(e),
+            "error": "Erro interno ao validar arquivo de som.",
         }

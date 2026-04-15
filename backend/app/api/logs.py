@@ -37,7 +37,8 @@ async def logs_stream(request: Request):
                     for line in lines[-50:]:
                         yield f"data: {line}\n\n"
         except Exception as e:
-            yield f"data: [ERROR] Could not read log file: {e}\n\n"
+            _ = e
+            yield "data: [ERROR] Could not read log file\n\n"
 
         # Segue o arquivo em modo tail -f
         last_size = os.path.getsize(log_file) if os.path.exists(log_file) else 0
@@ -63,7 +64,8 @@ async def logs_stream(request: Request):
                 except (asyncio.CancelledError, GeneratorExit):
                     return
                 except Exception as e:
-                    yield f"data: [ERROR] {e}\n\n"
+                    _ = e
+                    yield "data: [ERROR] Internal log stream error\n\n"
                     await asyncio.sleep(1)
         except (asyncio.CancelledError, GeneratorExit):
             return
