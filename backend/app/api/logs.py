@@ -5,7 +5,7 @@ import os
 import asyncio
 import aiofiles
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from ..logger import get_current_log_file_path
 from . import check_debug_auth
 
@@ -17,7 +17,7 @@ def logs_page(request: Request):
     """Página para visualizar logs em tempo real."""
     if not check_debug_auth(request):
         return JSONResponse(status_code=403, content={"error": "Forbidden"})
-    return FileResponse("static/logs.html")
+    return RedirectResponse(url="/mud/logs", status_code=307)
 
 
 @router.get("/api/logs/stream")

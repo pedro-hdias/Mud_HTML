@@ -5,7 +5,7 @@ Fornece normalização rápida e diagnóstico de arquivos de som.
 
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from ..config import AUDIO_DEBUG_DETAILS
+from ..config import AUDIO_DEBUG_DETAILS, SOUND_REGISTRY_DIR
 from ..logger import get_logger
 
 logger = get_logger(__name__)
@@ -34,7 +34,12 @@ class SoundRegistry:
             sounds_dir: Diretório de sons (padrão: static/sounds relativo à raiz do projeto)
         """
         if sounds_dir is None:
-            sounds_dir = Path(__file__).resolve().parents[2] / "static" / "sounds"
+            if SOUND_REGISTRY_DIR:
+                sounds_dir = Path(SOUND_REGISTRY_DIR)
+            else:
+                backend_candidate = Path(__file__).resolve().parents[2] / "static" / "sounds"
+                frontend_candidate = Path(__file__).resolve().parents[3] / "frontend" / "static" / "sounds"
+                sounds_dir = backend_candidate if backend_candidate.exists() else frontend_candidate
         
         self.sounds_dir = sounds_dir
         self._catalog: Dict[str, Path] = {}  # {normalized_lower: Path_real}

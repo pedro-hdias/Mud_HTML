@@ -37,6 +37,9 @@ AUDIO_DEBUG_DETAILS: Final[bool] = os.environ.get("AUDIO_DEBUG_DETAILS", "0").st
     "1", "true", "yes", "on"
 }
 
+# Diretório de sons para catalogação no backend
+SOUND_REGISTRY_DIR: Final[str] = os.environ.get("SOUND_REGISTRY_DIR", "").strip()
+
 # Códigos de fechamento WebSocket (reutilizáveis em ws.py e ws_handlers.py)
 WS_CLOSE_CODES: Final[Dict[str, int]] = {
     "session_invalid": 4003,

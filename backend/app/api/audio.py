@@ -2,7 +2,7 @@
 API de diagnóstico e validação do sistema de áudio.
 """
 from fastapi import APIRouter
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from ..logger import get_logger
 
 logger = get_logger("api.audio")
@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get("/audio")
 def audio_page():
     """Página de teste do engine de áudio."""
-    return FileResponse("static/audio.html")
+    return RedirectResponse(url="/mud/", status_code=307)
 
 
 @router.get("/api/audio/diagnostic")

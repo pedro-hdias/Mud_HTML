@@ -12,9 +12,11 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 
 ### Estrutura Principal
 
-- `v4/app/` — Backend Python (FastAPI, WebSocket, sessões, sons)
-- `v4/static/` — Frontend (HTML, CSS, JS)
-- `v4/Dockerfile` — Imagem Docker da versão atual
+- `backend/app/` — Backend Python (FastAPI, WebSocket, sessões, sons)
+- `backend/tests/` — Testes do backend
+- `backend/Dockerfile` — Imagem Docker do backend
+- `frontend/static/` — Frontend (HTML, CSS, JS)
+- `frontend/Dockerfile` — Imagem Docker do frontend (Nginx)
 - `docker-compose.yml` — Composição de serviços
 - `.github/workflows/` — Pipelines de CI/CD
 
@@ -51,18 +53,12 @@ Este repositório contém o **Web MUD Client** — um cliente web para jogar MUD
 
 ## Testes
 
-- Execute os testes com `pytest` a partir da pasta `v4/`.
+- Execute os testes com `pytest` a partir da pasta `backend/`.
 - Mantenha cobertura de testes para módulos críticos (ex: `sounds`, `sessions`).
 
 ## Docker
 
 - Para rodar localmente:
   ```bash
-  docker run -p 80:80 ghcr.io/pedro-hdias/mud_html:latest
-  ```
-- Para buildar a imagem:
-  ```bash
-  cd v4
-  docker build -t mudclient .
-  docker run -d -p 80:80 mudclient
+  docker compose up --build
   ```

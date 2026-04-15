@@ -2,10 +2,12 @@
 
 Cliente web para jogar MUD via navegador.
 
-## Estrutura atual
+## Estrutura
 
-- `v4/`: versão principal do projeto (FastAPI + frontend estático)
-- `docker-compose.yml`: composição local simplificada (serviço `mud-html`)
+- `backend/`: backend Python (FastAPI, WebSocket, sessões, sons, testes)
+- `frontend/`: frontend estático (HTML, CSS, JS e assets)
+- `docker-compose.yml`: composição local com serviços `mud-backend` e `mud-frontend`
+- `VERSION`: versão base usada para tags de release no GitHub Actions
 
 O projeto `shamy` é independente e deve ser operado em stack própria fora deste repositório.
 
@@ -15,7 +17,8 @@ O projeto `shamy` é independente e deve ser operado em stack própria fora dest
 docker compose up --build
 ```
 
-- Serviço: `mud-html`
+- Serviço público: `mud-frontend`
+- Serviço interno: `mud-backend`
 - Porta local: `127.0.0.1:18080`
 
 Este repositório não publica nem gerencia o `shamy`.
@@ -39,13 +42,13 @@ Verificar status:
 
 ```bash
 docker compose ps
-docker compose logs --tail 100 mud-html
+docker compose logs --tail 100 mud-frontend
+docker compose logs --tail 100 mud-backend
 ```
 
-## Imagem publicada
-
-Também é possível rodar via GHCR:
+## Testes
 
 ```bash
-docker run -p 80:80 ghcr.io/pedro-hdias/mud_html:latest
+cd backend
+python -m pytest
 ```

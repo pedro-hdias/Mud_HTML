@@ -2,7 +2,7 @@
 API de gerenciamento de sessões.
 """
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from ..ws import session_manager
 from . import check_debug_auth
 
@@ -14,7 +14,7 @@ def sessions_page(request: Request):
     """Página de debug para visualizar sessões ativas."""
     if not check_debug_auth(request):
         return JSONResponse(status_code=403, content={"error": "Forbidden"})
-    return FileResponse("static/sessions.html")
+    return RedirectResponse(url="/mud/sessions", status_code=307)
 
 
 @router.get("/api/sessions/status")
