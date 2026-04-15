@@ -5,7 +5,7 @@ import os
 import asyncio
 import aiofiles
 from fastapi import APIRouter, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 from ..logger import get_current_log_file_path
 from . import check_debug_auth
 
@@ -17,7 +17,7 @@ def logs_page(request: Request):
     """Página para visualizar logs em tempo real."""
     if not check_debug_auth(request):
         return JSONResponse(status_code=403, content={"error": "Forbidden"})
-    return FileResponse("static/logs.html")
+    return RedirectResponse(url="/mud/logs", status_code=307)
 
 
 @router.get("/api/logs/stream")
@@ -37,7 +37,8 @@ async def logs_stream(request: Request):
                     for line in lines[-50:]:
                         yield f"data: {line}\n\n"
         except Exception as e:
-            yield f"data: [ERROR] Could not read log file: {e}\n\n"
+            _ = e
+            yield "data: [ERROR] Could not read log file\n\n"
 
         # Segue o arquivo em modo tail -f
         last_size = os.path.getsize(log_file) if os.path.exists(log_file) else 0
@@ -63,7 +64,8 @@ async def logs_stream(request: Request):
                 except (asyncio.CancelledError, GeneratorExit):
                     return
                 except Exception as e:
-                    yield f"data: [ERROR] {e}\n\n"
+                    _ = e
+                    yield "data: [ERROR] Internal log stream error\n\n"
                     await asyncio.sleep(1)
         except (asyncio.CancelledError, GeneratorExit):
             return

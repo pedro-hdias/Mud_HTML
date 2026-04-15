@@ -98,19 +98,22 @@ jobs:
           echo "date=$DATE_FORMATTED" >> $GITHUB_OUTPUT
           echo "Current datetime: $DATE_FORMATTED"
 
-      # 3. Identificar a pasta v* mais recente
-      - name: Identify latest version
+      # 3. Ler versão base do arquivo VERSION
+      - name: Read base version
         id: version
         run: |
-          LATEST_VERSION=$(ls -d v*/ 2>/dev/null | sed 's#/##' | sort -V | tail -n1 || echo "v1")
-          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
-          echo "Latest version found: $LATEST_VERSION"
+          BASE_VERSION=$(tr -d ' \n\r' < VERSION 2>/dev/null || echo "4.0")
+          if [ -z "$BASE_VERSION" ]; then
+            BASE_VERSION="4.0"
+          fi
+          echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
+          echo "Base version found: $BASE_VERSION"
 
       # 4. Montar tag da release
       - name: Build release tag
         id: version_info
         run: |
-          VERSION_TAG="${{ steps.version.outputs.latest_version }}.${{ steps.date.outputs.date }}"
+          VERSION_TAG="v${{ steps.version.outputs.base_version }}.${{ steps.date.outputs.date }}"
           echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
           echo "Version tag: $VERSION_TAG"
 
