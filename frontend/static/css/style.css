@@ -254,6 +254,15 @@ body {
     font-weight: 600;
 }
 
+.password-visibility-toggle {
+    margin-top: 8px;
+}
+
+.password-visibility-toggle label {
+    cursor: pointer;
+    user-select: none;
+}
+
 /* Generic visibility classes for cross-browser compatibility (iOS fix) */
 .hidden {
     display: none !important;

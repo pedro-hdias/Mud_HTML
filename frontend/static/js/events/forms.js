@@ -10,6 +10,8 @@ const _EventFormsMethods = {
     bindLoginFormEvents() {
         const loginForm = getElement(CONFIG.SELECTORS.loginForm);
         const btnCancelLogin = getElement(CONFIG.SELECTORS.btnCancelLogin);
+        const passwordInput = getElement(CONFIG.SELECTORS.passwordInput);
+        const showPasswordInput = getElement(CONFIG.SELECTORS.showPasswordInput);
 
         if (loginForm) {
             loginForm.addEventListener("submit", (e) => {
@@ -19,10 +21,22 @@ const _EventFormsMethods = {
             }, { signal: this._abortController.signal });
         }
 
+        if (showPasswordInput && passwordInput) {
+            showPasswordInput.addEventListener("change", () => {
+                const shouldShow = showPasswordInput.checked;
+                passwordInput.type = shouldShow ? "text" : "password";
+                eventsLogger.log("Password visibility changed", { visible: shouldShow });
+                passwordInput.focus();
+            }, { signal: this._abortController.signal });
+        }
+
         if (btnCancelLogin) {
             btnCancelLogin.addEventListener("click", () => {
                 eventsLogger.log("Login cancel clicked - dismissing modal");
                 ModalManager.dismissLoginModal();
+
+                if (showPasswordInput) showPasswordInput.checked = false;
+                if (passwordInput) passwordInput.type = "password";
 
                 // Habilita o input para login manual após cancelar o formulário
                 const input = getElement(CONFIG.SELECTORS.input);

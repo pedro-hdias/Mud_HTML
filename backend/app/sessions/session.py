@@ -36,6 +36,9 @@ class MudSession:
         self.state = ConnectionState.DISCONNECTED
         self.last_activity = datetime.now()
         self.manual_disconnect = False       # Flag para desconexão intencional
+        self.awaiting_login_choice = False
+        self.pending_username: str | None = None
+        self.pending_password: str | None = None
         self.sound_engine = get_sound_engine()
         self.menu_detector = MenuDetector()
 
@@ -193,6 +196,9 @@ class MudSession:
         # Não limpa self.history — preserva para reconexão.
         # O histórico só é apagado em clear_session() quando a sessão é removida.
         self.partial_buffer = ""
+        self.awaiting_login_choice = False
+        self.pending_username = None
+        self.pending_password = None
 
         await self.broadcast_state(ConnectionState.DISCONNECTED)
 
@@ -200,6 +206,9 @@ class MudSession:
         """Limpa todos os dados da sessão (usado pelo manager ao remover)."""
         self._history.clear()
         self.partial_buffer = ""
+        self.awaiting_login_choice = False
+        self.pending_username = None
+        self.pending_password = None
 
     # ------------------------------------------------------------------
     # Loop de leitura (delega ao MudReader)

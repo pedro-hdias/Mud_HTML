@@ -20,6 +20,8 @@ const ModalManager = {
 
             const loginModal = getElement(CONFIG.SELECTORS.loginModal);
             const usernameInput = getElement(CONFIG.SELECTORS.usernameInput);
+            const passwordInput = getElement(CONFIG.SELECTORS.passwordInput);
+            const showPasswordInput = getElement(CONFIG.SELECTORS.showPasswordInput);
 
             if (!loginModal) {
                 modalsLogger.error("Login modal element not found");
@@ -27,6 +29,8 @@ const ModalManager = {
             }
 
             modalsLogger.log("Showing login modal");
+            if (showPasswordInput) showPasswordInput.checked = false;
+            if (passwordInput) passwordInput.type = "password";
             loginModal.classList.add(CONFIG.CLASSES.show);
             if (usernameInput) usernameInput.focus();
         } catch (e) {
@@ -37,9 +41,13 @@ const ModalManager = {
     hideLoginModal() {
         try {
             const loginModal = getElement(CONFIG.SELECTORS.loginModal);
+            const passwordInput = getElement(CONFIG.SELECTORS.passwordInput);
+            const showPasswordInput = getElement(CONFIG.SELECTORS.showPasswordInput);
             if (!loginModal) return;
 
             modalsLogger.log("Hiding login modal");
+            if (showPasswordInput) showPasswordInput.checked = false;
+            if (passwordInput) passwordInput.type = "password";
             loginModal.classList.remove(CONFIG.CLASSES.show);
         } catch (e) {
             modalsLogger.error("Error hiding login modal", e);

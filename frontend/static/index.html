@@ -130,7 +130,12 @@
 
             <label for="password">Password:</label>
             <input type="password" id="password" name="password" required autocomplete="current-password"
-                aria-required="true" />
+                autocapitalize="off" autocorrect="off" spellcheck="false" aria-required="true" />
+
+            <div class="form-check password-visibility-toggle">
+                <input type="checkbox" id="showPassword" name="showPassword" />
+                <label for="showPassword">Show password</label>
+            </div>
 
             <div class="form-check">
                 <input type="checkbox" id="saveSession" name="saveSession" />

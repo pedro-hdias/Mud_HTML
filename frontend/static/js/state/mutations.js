@@ -22,4 +22,9 @@ function transitionToPhase(nextPhase, reason) {
     if (nextPhase === "AUTH_IN_PROGRESS" || nextPhase === "IN_GAME") {
         if (typeof MenuManager !== "undefined") MenuManager.reset();
     }
+
+    if (nextPhase === "IN_GAME" && typeof UIHelpers !== "undefined") {
+        UIHelpers.addSystemMessage("[SYSTEM] Login concluído com sucesso.", "#4CAF50");
+        StateStore.setLoginShown(false);
+    }
 }
