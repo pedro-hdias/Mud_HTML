@@ -1,4 +1,4 @@
-name: Create GitHub Release on Main Merge
+name: Create Release and Deploy VPS on Main Merge
 
 on:
   pull_request:
@@ -6,12 +6,19 @@ on:
     branches:
       - main
 
+concurrency:
+  group: release-and-deploy-production
+  cancel-in-progress: false
+
 jobs:
-  create-github-release:
+  release-and-deploy-vps:
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      VPS_HOST: ${{ vars.VPS_HOST }}
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4
@@ -52,7 +59,7 @@ jobs:
           echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
           echo "Release exists: $RELEASE_EXISTS"
 
-      - name: Create GitHub Release
+      - name: Create GitHub release
         if: steps.check_release.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -76,21 +83,135 @@ jobs:
 
           echo "✅ Release criada com sucesso!"
 
-      - name: Update existing release
+      - name: Reuse existing release
         if: steps.check_release.outputs.exists == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe"
+          echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe. O deploy será executado com essa tag."
+
+      - name: Resolve deploy context
+        id: context
+        run: |
+          echo "release_tag=${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_OUTPUT
+
+      - name: Validate required variables
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_PATH" ]; then
+            echo "❌ A variável DEPLOY_PATH não foi configurada."
+            exit 1
+          fi
+
+          if [ -z "$VPS_HOST" ]; then
+            echo "❌ A variável VPS_HOST não foi configurada."
+            exit 1
+          fi
+
+          if [ -z "$VPS_USER" ]; then
+            echo "❌ O secret VPS_USER não foi configurado."
+            exit 1
+          fi
+
+          if [ -z "$VPS_PORT" ]; then
+            echo "❌ O secret VPS_PORT não foi configurado."
+            exit 1
+          fi
+
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "❌ O secret VPS_SSH_KEY não foi configurado."
+            exit 1
+          fi
+
+      - name: Execute VPS deploy via SSH
+        id: deploy_attempt_1
+        uses: appleboy/ssh-action@v1.0.3
+        continue-on-error: true
+        with:
+          host: ${{ vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          timeout: 2m
+          command_timeout: 20m
+          script: |
+            set -e
+
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+            RELEASE_TAG="${{ steps.context.outputs.release_tag }}"
+
+            echo "==== DEPLOY START $(date) ===="
+            echo "Diretório: ${DEPLOY_PATH}"
+            echo "Tag solicitada: ${RELEASE_TAG:-main}"
+
+            cd "$DEPLOY_PATH"
+            git fetch --all --tags --prune
+            git checkout main
+            git pull --ff-only origin main
+
+            if [ -n "$RELEASE_TAG" ]; then
+              git checkout "$RELEASE_TAG"
+            fi
+
+            docker compose down --remove-orphans || true
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+
+            echo "==== DEPLOY END $(date) ===="
+
+      - name: Retry VPS deploy via SSH
+        id: deploy_attempt_2
+        if: steps.deploy_attempt_1.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        continue-on-error: true
+        with:
+          host: ${{ vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          timeout: 2m
+          command_timeout: 20m
+          script: |
+            set -e
+
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+            RELEASE_TAG="${{ steps.context.outputs.release_tag }}"
+
+            echo "==== RETRY DEPLOY START $(date) ===="
+
+            cd "$DEPLOY_PATH"
+            git fetch --all --tags --prune
+            git checkout main
+            git pull --ff-only origin main
+
+            if [ -n "$RELEASE_TAG" ]; then
+              git checkout "$RELEASE_TAG"
+            fi
+
+            docker compose down --remove-orphans || true
+            docker compose up -d --build --remove-orphans
+            docker compose ps
+
+            echo "==== RETRY DEPLOY END $(date) ===="
 
       - name: Summary
+        if: always()
         run: |
-          echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Workflow de release e deploy" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **PR mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ steps.check_release.outputs.exists == 'true' && 'Release atualizada' || 'Release criada' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy VPS**: disparado automaticamente ao publicar a release" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.context.outputs.release_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release**: ${{ steps.check_release.outputs.exists == 'true' && 'Já existente' || 'Criada neste workflow' }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.deploy_attempt_1.outcome }}" = "success" ] || [ "${{ steps.deploy_attempt_2.outcome }}" = "success" ]; then
+            echo "- **Deploy VPS**: concluído com sucesso" >> $GITHUB_STEP_SUMMARY
+            echo "- **Host**: ${{ vars.VPS_HOST }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Diretório**: ${{ vars.DEPLOY_PATH }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.context.outputs.release_tag }})" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Deploy VPS**: falhou nas duas tentativas" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

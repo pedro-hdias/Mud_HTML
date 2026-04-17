@@ -1,144 +1,141 @@
-name: Deploy VPS on Release Published
+name: Deploy VPS Manual
 
 on:
-    release:
-        types:
-            - published
-    workflow_dispatch:
-        inputs:
-            release_tag:
-                description: "Tag da release para publicar na VPS"
-                required: false
-                type: string
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Tag da release para publicar na VPS"
+        required: false
+        type: string
 
 concurrency:
-    group: deploy-vps-production
-    cancel-in-progress: false
+  group: deploy-vps-production
+  cancel-in-progress: false
 
 jobs:
-    deploy-vps:
-        runs-on: ubuntu-latest
+  deploy-vps:
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+      VPS_HOST: ${{ vars.VPS_HOST }}
+    steps:
+      - name: Resolver contexto do deploy
+        id: context
+        run: |
+          RELEASE_TAG="${{ inputs.release_tag }}"
+          echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Validar variáveis obrigatórias
         env:
-            DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
-            VPS_HOST: ${{ vars.VPS_HOST }}
-        steps:
-            - name: Resolver contexto do deploy
-              id: context
-              run: |
-                  RELEASE_TAG="${{ github.event_name == 'release' && github.event.release.tag_name || inputs.release_tag }}"
-                  echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_PATH" ]; then
+            echo "❌ A variável DEPLOY_PATH não foi configurada."
+            exit 1
+          fi
 
-            - name: Validar variáveis obrigatórias
-              env:
-                  VPS_USER: ${{ secrets.VPS_USER }}
-                  VPS_PORT: ${{ secrets.VPS_PORT }}
-                  VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-              run: |
-                  if [ -z "$DEPLOY_PATH" ]; then
-                    echo "❌ A variável DEPLOY_PATH não foi configurada."
-                    exit 1
-                  fi
+          if [ -z "$VPS_HOST" ]; then
+            echo "❌ A variável VPS_HOST não foi configurada."
+            exit 1
+          fi
 
-                  if [ -z "$VPS_HOST" ]; then
-                    echo "❌ A variável VPS_HOST não foi configurada."
-                    exit 1
-                  fi
+          if [ -z "$VPS_USER" ]; then
+            echo "❌ O secret VPS_USER não foi configurado."
+            exit 1
+          fi
 
-                  if [ -z "$VPS_USER" ]; then
-                    echo "❌ O secret VPS_USER não foi configurado."
-                    exit 1
-                  fi
+          if [ -z "$VPS_PORT" ]; then
+            echo "❌ O secret VPS_PORT não foi configurado."
+            exit 1
+          fi
 
-                  if [ -z "$VPS_PORT" ]; then
-                    echo "❌ O secret VPS_PORT não foi configurado."
-                    exit 1
-                  fi
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "❌ O secret VPS_SSH_KEY não foi configurado."
+            exit 1
+          fi
 
-                  if [ -z "$VPS_SSH_KEY" ]; then
-                    echo "❌ O secret VPS_SSH_KEY não foi configurado."
-                    exit 1
-                  fi
+      - name: Conectar via SSH e executar deploy
+        id: deploy_attempt_1
+        uses: appleboy/ssh-action@v1.0.3
+        continue-on-error: true
+        with:
+          host: ${{ vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          timeout: 2m
+          command_timeout: 20m
+          script: |
+            set -e
 
-            - name: Conectar via SSH e executar deploy
-              id: deploy_attempt_1
-              uses: appleboy/ssh-action@v1.0.3
-              continue-on-error: true
-              with:
-                  host: ${{ vars.VPS_HOST }}
-                  username: ${{ secrets.VPS_USER }}
-                  key: ${{ secrets.VPS_SSH_KEY }}
-                  port: ${{ secrets.VPS_PORT }}
-                  timeout: 2m
-                  command_timeout: 20m
-                  script: |
-                      set -e
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+            RELEASE_TAG="${{ steps.context.outputs.release_tag }}"
 
-                      DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
-                      RELEASE_TAG="${{ steps.context.outputs.release_tag }}"
+            echo "==== DEPLOY START $(date) ===="
+            echo "Diretório: ${DEPLOY_PATH}"
+            echo "Tag solicitada: ${RELEASE_TAG:-main}"
 
-                      echo "==== DEPLOY START $(date) ===="
-                      echo "Diretório: ${DEPLOY_PATH}"
-                      echo "Tag solicitada: ${RELEASE_TAG:-main}"
+            cd "$DEPLOY_PATH"
+            git fetch --all --tags --prune
+            git checkout main
+            git pull --ff-only origin main
 
-                      cd "$DEPLOY_PATH"
-                      git fetch --all --tags --prune
-                      git checkout main
-                      git pull --ff-only origin main
+            if [ -n "$RELEASE_TAG" ]; then
+              git checkout "$RELEASE_TAG"
+            fi
 
-                      if [ -n "$RELEASE_TAG" ]; then
-                        git checkout "$RELEASE_TAG"
-                      fi
+            docker compose down --remove-orphans || true
+            docker compose up -d --build --remove-orphans
+            docker compose ps
 
-                      docker compose down --remove-orphans || true
-                      docker compose up -d --build --remove-orphans
-                      docker compose ps
+            echo "==== DEPLOY END $(date) ===="
 
-                      echo "==== DEPLOY END $(date) ===="
+      - name: Retry do deploy via SSH
+        id: deploy_attempt_2
+        if: steps.deploy_attempt_1.outcome == 'failure'
+        uses: appleboy/ssh-action@v1.0.3
+        continue-on-error: true
+        with:
+          host: ${{ vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          timeout: 2m
+          command_timeout: 20m
+          script: |
+            set -e
 
-            - name: Retry do deploy via SSH
-              id: deploy_attempt_2
-              if: steps.deploy_attempt_1.outcome == 'failure'
-              uses: appleboy/ssh-action@v1.0.3
-              continue-on-error: true
-              with:
-                  host: ${{ vars.VPS_HOST }}
-                  username: ${{ secrets.VPS_USER }}
-                  key: ${{ secrets.VPS_SSH_KEY }}
-                  port: ${{ secrets.VPS_PORT }}
-                  timeout: 2m
-                  command_timeout: 20m
-                  script: |
-                      set -e
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+            RELEASE_TAG="${{ steps.context.outputs.release_tag }}"
 
-                      DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
-                      RELEASE_TAG="${{ steps.context.outputs.release_tag }}"
+            echo "==== RETRY DEPLOY START $(date) ===="
 
-                      echo "==== RETRY DEPLOY START $(date) ===="
+            cd "$DEPLOY_PATH"
+            git fetch --all --tags --prune
+            git checkout main
+            git pull --ff-only origin main
 
-                      cd "$DEPLOY_PATH"
-                      git fetch --all --tags --prune
-                      git checkout main
-                      git pull --ff-only origin main
+            if [ -n "$RELEASE_TAG" ]; then
+              git checkout "$RELEASE_TAG"
+            fi
 
-                      if [ -n "$RELEASE_TAG" ]; then
-                        git checkout "$RELEASE_TAG"
-                      fi
+            docker compose down --remove-orphans || true
+            docker compose up -d --build --remove-orphans
+            docker compose ps
 
-                      docker compose down --remove-orphans || true
-                      docker compose up -d --build --remove-orphans
-                      docker compose ps
+            echo "==== RETRY DEPLOY END $(date) ===="
 
-                      echo "==== RETRY DEPLOY END $(date) ===="
-
-            - name: Publicar resumo do deploy
-              if: always()
-              run: |
-                  if [ "${{ steps.deploy_attempt_1.outcome }}" = "success" ] || [ "${{ steps.deploy_attempt_2.outcome }}" = "success" ]; then
-                    echo "## ✅ Deploy concluído com sucesso" >> $GITHUB_STEP_SUMMARY
-                    echo "- Host: ${{ vars.VPS_HOST }}" >> $GITHUB_STEP_SUMMARY
-                    echo "- Diretório: ${{ vars.DEPLOY_PATH }}" >> $GITHUB_STEP_SUMMARY
-                    echo "- Tag: ${{ steps.context.outputs.release_tag || 'main' }}" >> $GITHUB_STEP_SUMMARY
-                  else
-                    echo "## ❌ Falha nas duas tentativas de deploy via SSH" >> $GITHUB_STEP_SUMMARY
-                    exit 1
-                  fi
+      - name: Publicar resumo do deploy
+        if: always()
+        run: |
+          if [ "${{ steps.deploy_attempt_1.outcome }}" = "success" ] || [ "${{ steps.deploy_attempt_2.outcome }}" = "success" ]; then
+            echo "## ✅ Deploy concluído com sucesso" >> $GITHUB_STEP_SUMMARY
+            echo "- Host: ${{ vars.VPS_HOST }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Diretório: ${{ vars.DEPLOY_PATH }}" >> $GITHUB_STEP_SUMMARY
+            echo "- Tag: ${{ steps.context.outputs.release_tag || 'main' }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Falha nas duas tentativas de deploy via SSH" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

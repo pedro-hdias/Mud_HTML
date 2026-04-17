@@ -10,9 +10,23 @@ from unittest.mock import AsyncMock
 
 from fastapi import WebSocket
 
+from app.mud import parser
 from app.mud.state import ConnectionState
 from app.sessions.mud_reader import MudReader
 from app.ws_handlers import handle_login
+
+
+def test_detect_initial_login_menu_aceita_variacoes_do_prompt_inicial() -> None:
+    """A detecção do menu inicial deve tolerar formatações comuns do MUD."""
+    menu_text = """
+    Valid commands are:
+    P) Play an existing character
+    N) Create a new character
+    Q) Quit
+    [Input]
+    """
+
+    assert parser.detect_initial_login_menu(menu_text) is True
 
 
 def test_handle_login_repassa_username_e_password_quando_ja_esta_no_prompt() -> None:
