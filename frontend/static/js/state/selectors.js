@@ -134,7 +134,7 @@ function checkAndShowLogin() {
         ? StateStore.getSessionPhase()
         : "UNAUTHENTICATED";
 
-    stateLogger.log("Check login display state:", connectionState, "shown:", loginShown);
+    stateLogger.debug("Check login display state:", connectionState, "shown:", loginShown);
 
     if (!StateStore.isLoginPromptAllowed()) {
         stateLogger.debug("Login display skipped: prompt not allowed");
