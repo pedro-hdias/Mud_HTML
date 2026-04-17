@@ -14,6 +14,11 @@ _USERNAME_PROMPT_PATTERNS = (
     re.compile(r"(?:enter|type|digite|informe).*(?:username|user\s*name|login|name)\s*[:?]?\s*$", re.IGNORECASE),
 )
 
+_INITIAL_LOGIN_OPTION_PATTERN = re.compile(
+    r"^(?:\[\s*p\s*\]|p[\)\].:-]?)\s*(?:-|:)?\s*.*(?:existing|character)",
+    re.IGNORECASE,
+)
+
 
 def detect_disconnection(text: str) -> bool:
     """Detecta se o servidor enviou mensagem de desconexão"""
@@ -39,8 +44,15 @@ def detect_username_prompt(text: str) -> bool:
 
 def detect_initial_login_menu(text: str) -> bool:
     """Detecta o menu inicial que exige escolher a opção de login existente."""
-    text_lower = text.lower()
-    return "valid commands are:" in text_lower and "[p] - log in to an existing character" in text_lower
+    stripped_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not stripped_lines:
+        return False
+
+    has_header = any("valid commands are:" in line.lower() for line in stripped_lines)
+    if not has_header:
+        return False
+
+    return any(_INITIAL_LOGIN_OPTION_PATTERN.search(line) for line in stripped_lines)
 
 
 def detect_input_prompt(text: str) -> bool:
