@@ -317,14 +317,16 @@ const _UIHelperMethods = {
         if (secure === (input.type === "password")) return;
 
         if (secure) {
-            // Preserva o valor atual para evitar perda de digitação em prompts fragmentados.
-            const currentValue = input.value;
-            input.setAttribute("autocomplete", "current-password");
+            // O input principal é um terminal, não um campo real de login do navegador.
+            // Evita autofill/password managers e limpa qualquer resíduo anterior antes da senha.
+            input.setAttribute("autocomplete", "off");
             input.setAttribute("autocapitalize", "off");
             input.setAttribute("autocorrect", "off");
             input.setAttribute("spellcheck", "false");
+            input.setAttribute("data-lpignore", "true");
+            input.setAttribute("data-1p-ignore", "true");
             input.type = "password";
-            input.value = currentValue;
+            input.value = "";
             const secureAriaLabel = input.dataset.secureAriaLabel || "Enter password (hidden)";
             input.setAttribute("aria-label", secureAriaLabel);
             const securePlaceholder = input.dataset.securePlaceholder || "Enter password...";
@@ -357,6 +359,8 @@ const _UIHelperMethods = {
             input.removeAttribute("autocapitalize");
             input.removeAttribute("autocorrect");
             input.removeAttribute("spellcheck");
+            input.removeAttribute("data-lpignore");
+            input.removeAttribute("data-1p-ignore");
         }
     },
 
