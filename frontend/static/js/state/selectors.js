@@ -128,33 +128,46 @@ function updateConnectionState(state) {
  * Verifica e exibe o modal de login quando apropriado.
  */
 function checkAndShowLogin() {
-    stateLogger.log("Check login display", "state:", StateStore.getConnectionState(), "shown:", StateStore.isLoginShown());
+    const connectionState = StateStore.getConnectionState();
+    const loginShown = StateStore.isLoginShown();
+    const sessionPhase = typeof StateStore.getSessionPhase === "function"
+        ? StateStore.getSessionPhase()
+        : "UNAUTHENTICATED";
+
+    stateLogger.log("Check login display state:", connectionState, "shown:", loginShown);
 
     if (!StateStore.isLoginPromptAllowed()) {
-        stateLogger.warn("Login display blocked: prompt not allowed");
+        stateLogger.debug("Login display skipped: prompt not allowed");
         return;
     }
 
-    if (!StateStore.isLoginShown() && StateStore.getConnectionState() === "CONNECTED") {
-        const savedCredentials = StateStore.getSavedCredentials();
-        if (savedCredentials) {
-            stateLogger.log("Using saved credentials for login");
-            sendLogin(savedCredentials.username, savedCredentials.password);
-            StateStore.setLoginShown(true);
-        } else {
-            if (StateStore.isLoginModalScheduled()) {
-                stateLogger.warn("Login modal already scheduled");
-                return;
-            }
-            StateStore.setLoginModalScheduled(true);
-            StateStore.setLoginShown(true);
-            setTimeout(() => {
-                ModalManager.showLoginModal();
-            }, CONFIG.TIMEOUTS.loginModalDelay);
-        }
-    } else if (StateStore.isLoginShown()) {
-        stateLogger.warn("Login display blocked: already shown");
-    } else {
-        stateLogger.warn("Login display blocked: state is not CONNECTED");
+    // Evita reprocessar prompts repetidos depois que o login já foi iniciado.
+    if (loginShown || sessionPhase === "AUTH_IN_PROGRESS" || sessionPhase === "IN_GAME") {
+        stateLogger.debug("Login display skipped: authentication already handled");
+        return;
     }
+
+    if (connectionState !== "CONNECTED") {
+        stateLogger.debug("Login display skipped: state is not CONNECTED");
+        return;
+    }
+
+    const savedCredentials = StateStore.getSavedCredentials();
+    if (savedCredentials) {
+        stateLogger.log("Using saved credentials for login");
+        sendLogin(savedCredentials.username, savedCredentials.password);
+        StateStore.setLoginShown(true);
+        return;
+    }
+
+    if (StateStore.isLoginModalScheduled()) {
+        stateLogger.debug("Login modal already scheduled");
+        return;
+    }
+
+    StateStore.setLoginModalScheduled(true);
+    StateStore.setLoginShown(true);
+    setTimeout(() => {
+        ModalManager.showLoginModal();
+    }, CONFIG.TIMEOUTS.loginModalDelay);
 }
