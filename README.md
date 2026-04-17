@@ -25,17 +25,30 @@ Este repositório não publica nem gerencia o `shamy`.
 
 ## Produção (VPS)
 
-Subir em modo produção:
+O deploy de produção é disparado automaticamente quando uma release é publicada no GitHub.
+
+Subir manualmente em modo produção, se necessário:
 
 ```bash
-docker compose up -d --build
+docker compose down --remove-orphans
+docker compose up -d --build --remove-orphans
 ```
 
-Atualizar versão na VPS (pull + rebuild + restart):
+Atualizar versão na VPS manualmente (contingência):
 
 ```bash
-git pull --ff-only
-docker compose up -d --build
+git fetch --all --tags --prune
+git checkout main
+git pull --ff-only origin main
+docker compose down --remove-orphans
+docker compose up -d --build --remove-orphans
+```
+
+A porta do frontend pode ser parametrizada por variáveis de ambiente:
+
+```bash
+FRONTEND_BIND_HOST=127.0.0.1
+FRONTEND_PORT=18080
 ```
 
 Verificar status:
