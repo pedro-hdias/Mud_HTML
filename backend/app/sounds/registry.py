@@ -25,28 +25,80 @@ class SoundRegistry:
     Cataloga todos os sons disponíveis no disco.
     Permite normalização rápida de caminhos (case-insensitive lookup).
     """
-    
+
     def __init__(self, sounds_dir: Optional[Path] = None):
         """
         Inicializa registry.
-        
+
         Args:
             sounds_dir: Diretório de sons (padrão: static/sounds relativo à raiz do projeto)
         """
-        if sounds_dir is None:
-            if SOUND_REGISTRY_DIR:
-                sounds_dir = Path(SOUND_REGISTRY_DIR)
-            else:
-                backend_candidate = Path(__file__).resolve().parents[2] / "static" / "sounds"
-                frontend_candidate = Path(__file__).resolve().parents[3] / "frontend" / "static" / "sounds"
-                sounds_dir = backend_candidate if backend_candidate.exists() else frontend_candidate
-        
-        self.sounds_dir = sounds_dir
+        self.sounds_dir = self._resolve_sounds_dir(sounds_dir)
         self._catalog: Dict[str, Path] = {}  # {normalized_lower: Path_real}
         self._categories: Dict[str, List[str]] = {}  # {category: [files]}
         self._inventory_tree: Dict[str, Any] = {}
-        
+
         self._refresh()
+
+    @staticmethod
+    def _has_sound_files(directory: Path) -> bool:
+        """Retorna True quando o diretório contém ao menos um .ogg."""
+        if not directory.exists() or not directory.is_dir():
+            return False
+
+        return any(directory.rglob("*.ogg"))
+
+    def _get_fallback_dirs(self) -> List[Path]:
+        """Lista caminhos candidatos conhecidos para o catálogo de sons."""
+        project_root = Path(__file__).resolve().parents[3]
+        backend_root = Path(__file__).resolve().parents[2]
+
+        return [
+            backend_root / "static" / "sounds",
+            project_root / "frontend" / "static" / "sounds",
+            Path("/app/sounds"),
+        ]
+
+    def _resolve_sounds_dir(self, sounds_dir: Optional[Path]) -> Path:
+        """Escolhe o melhor diretório disponível para o inventário de sons."""
+        configured_dir = Path(sounds_dir) if sounds_dir is not None else None
+        if configured_dir is None and SOUND_REGISTRY_DIR:
+            configured_dir = Path(SOUND_REGISTRY_DIR)
+
+        candidates: List[Path] = []
+        if configured_dir is not None:
+            candidates.append(configured_dir)
+        candidates.extend(self._get_fallback_dirs())
+
+        seen: set[str] = set()
+        first_existing: Optional[Path] = None
+
+        for candidate in candidates:
+            normalized_candidate = Path(candidate)
+            candidate_key = str(normalized_candidate)
+            if candidate_key in seen:
+                continue
+            seen.add(candidate_key)
+
+            if not normalized_candidate.exists():
+                continue
+
+            if first_existing is None:
+                first_existing = normalized_candidate
+
+            if self._has_sound_files(normalized_candidate):
+                if configured_dir is not None and normalized_candidate != configured_dir:
+                    logger.warning(
+                        "Diretório configurado de sons está vazio ou inválido (%s). Usando fallback: %s",
+                        configured_dir,
+                        normalized_candidate,
+                    )
+                return normalized_candidate
+
+        if first_existing is not None:
+            return first_existing
+
+        return configured_dir if configured_dir is not None else self._get_fallback_dirs()[0]
     
     def _refresh(self):
         """Indexa todos os arquivos .ogg recursivamente."""
@@ -56,6 +108,10 @@ class SoundRegistry:
         
         if not self.sounds_dir.exists():
             logger.warning(f"Diretório de sons não encontrado: {self.sounds_dir}")
+            return
+
+        if not self._has_sound_files(self.sounds_dir):
+            logger.warning(f"Diretório de sons está acessível, mas vazio: {self.sounds_dir}")
             return
         
         count = 0
