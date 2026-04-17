@@ -25,6 +25,26 @@ class MudReader:
         """
         self._session = session
 
+    async def _flush_pending_credentials_if_needed(self, text: str) -> None:
+        """Envia credenciais pendentes quando o servidor solicitar cada etapa do login."""
+        session = self._session
+
+        if parser.detect_initial_login_menu(text):
+            session.awaiting_login_choice = True
+
+        pending_username = getattr(session, "pending_username", None)
+        if pending_username and parser.detect_username_prompt(text):
+            await session.send_to_mud((pending_username + "\n").encode())
+            session.pending_username = None
+            session.awaiting_login_choice = False
+            logger.info(f"Session {session.public_id}: username pendente enviado após prompt do servidor")
+
+        pending_password = getattr(session, "pending_password", None)
+        if pending_password and parser.detect_password_prompt(text):
+            await session.send_to_mud((pending_password + "\n").encode())
+            session.pending_password = None
+            logger.info(f"Session {session.public_id}: senha pendente enviada após prompt do servidor")
+
     async def run(self) -> None:
         """Loop principal de leitura. Executa até desconexão ou cancelamento."""
         session = self._session
@@ -43,6 +63,7 @@ class MudReader:
                 text = data.decode(errors="ignore")
                 session.partial_buffer += text
                 session._append_history(text)
+                await self._flush_pending_credentials_if_needed(session.partial_buffer)
 
                 # Processa linhas completas
                 while "\n" in session.partial_buffer:

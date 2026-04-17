@@ -317,11 +317,14 @@ const _UIHelperMethods = {
         if (secure === (input.type === "password")) return;
 
         if (secure) {
-            // Limpa conteúdo anterior primeiro para evitar que texto persista durante a transição
-            input.value = "";
-            // Desativa autocomplete ANTES de mudar o tipo para evitar autofill do navegador
-            input.setAttribute("autocomplete", "off");
+            // Preserva o valor atual para evitar perda de digitação em prompts fragmentados.
+            const currentValue = input.value;
+            input.setAttribute("autocomplete", "current-password");
+            input.setAttribute("autocapitalize", "off");
+            input.setAttribute("autocorrect", "off");
+            input.setAttribute("spellcheck", "false");
             input.type = "password";
+            input.value = currentValue;
             const secureAriaLabel = input.dataset.secureAriaLabel || "Enter password (hidden)";
             input.setAttribute("aria-label", secureAriaLabel);
             const securePlaceholder = input.dataset.securePlaceholder || "Enter password...";
@@ -351,6 +354,9 @@ const _UIHelperMethods = {
                 input.removeAttribute("aria-describedby");
             }
             input.removeAttribute("autocomplete");
+            input.removeAttribute("autocapitalize");
+            input.removeAttribute("autocorrect");
+            input.removeAttribute("spellcheck");
         }
     },
 

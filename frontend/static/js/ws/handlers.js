@@ -8,6 +8,8 @@ const IN_GAME_PATTERNS = [
     /^obvious exits?:/i,
     /^exits?:\s/i,
     /you (?:are in|go |enter |leave |arrive)/i,
+    /you can go\b/i,
+    /^\[".+";.+\]$/i,
     /^\[hp:/i,
 ];
 
@@ -237,21 +239,22 @@ function handleLineMessage(payload) {
 
     // Detecta quando o servidor está aguardando input/login
     const lineText = payload.content.toLowerCase();
-    const hasInputPrompt = lineText.includes("[input]") ||
-        lineText.includes("name:") ||
-        lineText.includes("login:");
+    const lineTextClean = lineText.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
+    const hasInputPrompt = lineTextClean.includes("[input]") ||
+        /\b(?:username|user\s*name|name|login)\s*:\s*$/i.test(lineTextClean);
 
     // Apenas chama checkAndShowLogin se detectar explicitamente um prompt de entrada
     if (hasInputPrompt) {
         checkAndShowLogin();
     }
 
-    // Ativa entrada segura (tipo password) quando o servidor solicita senha
-    // Remove códigos ANSI antes de comparar (ex: reset \x1b[0m no final do prompt colorido)
-    const lineTextClean = lineText.replace(/\x1b\[[0-9;]*m/g, "").trimEnd();
-    const hasPasswordPrompt = /password:$/.test(lineTextClean) || /senha:$/.test(lineTextClean);
+    // Ativa entrada segura (tipo password) quando o servidor solicita senha.
+    const hasPasswordPrompt = /(?:^|\b)(?:password|senha|passwd)\s*[:?]\s*$/i.test(lineTextClean) ||
+        /(?:enter|type|digite|informe).*(?:password|senha|passwd)\s*[:?]?\s*$/i.test(lineTextClean);
     if (hasPasswordPrompt) {
         UIHelpers.setInputSecure(true);
+    } else if (hasInputPrompt) {
+        UIHelpers.setInputSecure(false);
     }
 
     // Detecta sinais de jogo para transicionar a fase da sessão

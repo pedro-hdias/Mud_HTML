@@ -7,78 +7,8 @@ on:
       - main
 
 jobs:
-  deploy-vps:
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Conectar via SSH e executar deploy (tentativa 1)
-        id: deploy_attempt_1
-        uses: appleboy/ssh-action@v1.0.3
-        continue-on-error: true
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          timeout: 2m
-          command_timeout: 20m
-          script: |
-            cd ${{ vars.DEPLOY_PATH }}
-
-            echo "==== DEPLOY START $(date) ===="
-
-            git pull origin main
-
-            docker compose down
-            docker compose build --no-cache
-            docker compose up -d
-
-            docker image prune -af
-            docker builder prune -af
-
-            echo "==== DEPLOY END $(date) ===="
-
-      - name: Conectar via SSH e executar deploy (tentativa 2)
-        id: deploy_attempt_2
-        if: steps.deploy_attempt_1.outcome == 'failure'
-        uses: appleboy/ssh-action@v1.0.3
-        continue-on-error: true
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          timeout: 2m
-          command_timeout: 20m
-          script: |
-            cd ${{ vars.DEPLOY_PATH }}
-
-            echo "==== DEPLOY START $(date) ===="
-
-            git pull origin main
-
-            docker compose down
-            docker compose build --no-cache
-            docker compose up -d
-
-            docker image prune -af
-            docker builder prune -af
-
-            echo "==== DEPLOY END $(date) ===="
-
-      - name: Validar resultado do deploy
-        if: always()
-        run: |
-          if [ "${{ steps.deploy_attempt_1.outcome }}" = "success" ] || [ "${{ steps.deploy_attempt_2.outcome }}" = "success" ]; then
-            echo "✅ Deploy concluído com sucesso."
-          else
-            echo "❌ Falha nas duas tentativas de deploy via SSH."
-            exit 1
-          fi
-
   create-github-release:
     if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'develop'
-    needs: deploy-vps
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -165,7 +95,7 @@ jobs:
         run: |
           echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy VPS**: concluído antes da release" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy VPS**: disparado separadamente ao publicar a release" >> $GITHUB_STEP_SUMMARY
           echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY

@@ -78,7 +78,7 @@ const SoundHandler = (() => {
         }
 
         // Concatena prefixo do servidor com o caminho do arquivo
-        const fullPath = `${typeof buildMudPath === "function" ? buildMudPath("/static/sounds") : "/static/sounds"}/${path}`;
+        const fullPath = `${typeof buildMudPath === "function" ? buildMudPath("/sounds") : "/sounds"}/${path}`;
 
         log("debug", `[PlaySound] Tentativa`, {
             path,

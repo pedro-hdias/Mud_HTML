@@ -88,6 +88,7 @@ const CONFIG = {
         loginForm: "#loginForm",
         usernameInput: "#username",
         passwordInput: "#password",
+        showPasswordInput: "#showPassword",
         saveSessionInput: "#saveSession",
 
         // Modal de confirmação

@@ -46,6 +46,22 @@ docker compose logs --tail 100 mud-frontend
 docker compose logs --tail 100 mud-backend
 ```
 
+### Deploy automático por release
+
+Ao publicar uma nova release no GitHub, o workflow [.github/workflows/release-deploy-vps.yml](.github/workflows/release-deploy-vps.yml) conecta na VPS Ubuntu por SSH e executa o deploy usando o diretório definido em `DEPLOY_PATH`.
+
+Configure no repositório:
+
+- **Variables**: `DEPLOY_PATH`, `VPS_HOST`
+- **Secrets**: `VPS_PORT`, `VPS_SSH_KEY`, `VPS_USER`
+
+O workflow faz:
+
+1. `git fetch --all --tags --prune`
+2. atualização da `main`
+3. checkout da tag da release publicada
+4. `docker compose up -d --build`
+
 ## Testes
 
 ```bash
