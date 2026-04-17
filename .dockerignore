@@ -1,0 +1,13 @@
+.git
+.gitignore
+.venv
+.vscode
+.idea
+**/__pycache__
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+backend/logs
+old
+dock
+base xml
