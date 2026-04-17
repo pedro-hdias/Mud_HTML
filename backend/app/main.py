@@ -24,6 +24,11 @@ async def lifespan(app):
     registry = get_registry(force_refresh=True)
     registry_stats = registry.get_stats()
     logger.info(f"Audio inventory loaded: {registry_stats['total_files']} arquivos de áudio encontrados")
+    if registry_stats["total_files"] == 0:
+        logger.warning(
+            f"Nenhum arquivo de áudio encontrado em {registry_stats['sounds_dir']}. "
+            "O backend continuará ativo, mas o sistema de sons ficará indisponível."
+        )
     if AUDIO_DEBUG_DETAILS:
         logger.info(f"Audio inventory (debug) por categoria: {registry_stats['categories']}")
 

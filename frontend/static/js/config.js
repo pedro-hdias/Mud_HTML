@@ -12,7 +12,24 @@ function _readMeta(name, fallback) {
     return el ? el.getAttribute("content") : fallback;
 }
 
+function _normalizeBasePath(path) {
+    if (!path || path === "/") {
+        return "";
+    }
+
+    return path.endsWith("/") ? path.slice(0, -1) : path;
+}
+
 function _detectBasePath() {
+    const currentScript = document.querySelector('script[src*="/js/config.js"], script[src$="js/config.js"]');
+    const scriptSrc = currentScript ? currentScript.getAttribute("src") : "";
+
+    if (scriptSrc) {
+        const resolvedUrl = new URL(scriptSrc, window.location.href);
+        const inferredBasePath = resolvedUrl.pathname.replace(/(?:\/static)?\/js\/config\.js$/, "");
+        return _normalizeBasePath(inferredBasePath);
+    }
+
     const path = location.pathname;
     if (path === "/mud" || path.startsWith("/mud/")) {
         return "/mud";
