@@ -13,14 +13,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      # 1. Fazer checkout da main
       - name: Checkout main branch
         uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
 
-      # 2. Obter data/hora da release
       - name: Get current datetime
         id: date
         run: |
@@ -28,7 +26,6 @@ jobs:
           echo "date=$DATE_FORMATTED" >> $GITHUB_OUTPUT
           echo "Current datetime: $DATE_FORMATTED"
 
-      # 3. Ler versão base do arquivo VERSION
       - name: Read base version
         id: version
         run: |
@@ -39,7 +36,6 @@ jobs:
           echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
           echo "Base version found: $BASE_VERSION"
 
-      # 4. Montar tag da release
       - name: Build release tag
         id: version_info
         run: |
@@ -47,7 +43,6 @@ jobs:
           echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
           echo "Version tag: $VERSION_TAG"
 
-      # 5. Verificar se a release já existe
       - name: Check if release exists
         id: check_release
         env:
@@ -57,7 +52,6 @@ jobs:
           echo "exists=$RELEASE_EXISTS" >> $GITHUB_OUTPUT
           echo "Release exists: $RELEASE_EXISTS"
 
-      # 6. Criar a release do GitHub
       - name: Create GitHub Release
         if: steps.check_release.outputs.exists == 'false'
         env:
@@ -82,7 +76,6 @@ jobs:
 
           echo "✅ Release criada com sucesso!"
 
-      # 7. Atualizar release existente
       - name: Update existing release
         if: steps.check_release.outputs.exists == 'true'
         env:
@@ -90,15 +83,14 @@ jobs:
         run: |
           echo "ℹ️ Release ${{ steps.version_info.outputs.version_tag }} já existe"
 
-      # 8. Resumo
       - name: Summary
         run: |
           echo "## ✅ Release Workflow Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Deploy VPS**: disparado separadamente ao publicar a release" >> $GITHUB_STEP_SUMMARY
           echo "- **PR Mergeado**: #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Branch**: ${{ github.event.pull_request.head.ref }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Tag**: ${{ steps.version_info.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status**: ${{ steps.check_release.outputs.exists == 'true' && 'Release atualizada' || 'Release criada' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy VPS**: disparado automaticamente ao publicar a release" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔗 [Ver Release](https://github.com/${{ github.repository }}/releases/tag/${{ steps.version_info.outputs.version_tag }})" >> $GITHUB_STEP_SUMMARY
