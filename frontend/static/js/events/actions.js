@@ -76,8 +76,9 @@ const _EventActionsMethods = {
         const isPasswordMode = input.type === "password";
         const command = isPasswordMode ? input.value : input.value.trim();
         if (command) {
-            if (StateStore.getConnectionState() !== "CONNECTED") {
-                eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
+            const connectionState = StateStore.getConnectionState();
+            if (!["CONNECTED", "AWAITING_LOGIN"].includes(connectionState)) {
+                eventsLogger.warn("Send blocked: state is not ready", connectionState);
                 return;
             }
 
@@ -93,8 +94,8 @@ const _EventActionsMethods = {
             return;
         }
 
-        if (StateStore.getConnectionState() !== "CONNECTED") {
-            eventsLogger.warn("Send blocked: state is not CONNECTED", StateStore.getConnectionState());
+        if (!["CONNECTED", "AWAITING_LOGIN"].includes(StateStore.getConnectionState())) {
+            eventsLogger.warn("Send blocked: state is not ready", StateStore.getConnectionState());
             return;
         }
 
@@ -117,6 +118,7 @@ const _EventActionsMethods = {
         const usernameInput = getElement(CONFIG.SELECTORS.usernameInput);
         const passwordInput = getElement(CONFIG.SELECTORS.passwordInput);
         const saveSessionInput = getElement(CONFIG.SELECTORS.saveSessionInput);
+        const showPasswordInput = getElement(CONFIG.SELECTORS.showPasswordInput);
 
         if (!usernameInput || !passwordInput) return;
 
@@ -136,7 +138,11 @@ const _EventActionsMethods = {
         StateManager.saveLoginState();
         sendLogin(username, password);
 
-        if (passwordInput) passwordInput.value = "";
+        if (passwordInput) {
+            passwordInput.value = "";
+            passwordInput.type = "password";
+        }
+        if (showPasswordInput) showPasswordInput.checked = false;
         ModalManager.hideLoginModal();
     },
 
