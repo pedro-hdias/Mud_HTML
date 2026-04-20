@@ -11,6 +11,35 @@ from .resolver import resolve_vars, strip_quotes
 logger = get_logger(__name__)
 
 
+def _escape_backslashes_in_literals(expr: str) -> str:
+    """Duplica barras invertidas em literais, preservando aspas já escapadas."""
+    result: List[str] = []
+    in_quote = None
+    i = 0
+
+    while i < len(expr):
+        ch = expr[i]
+
+        if in_quote:
+            if ch == "\\":
+                next_ch = expr[i + 1] if i + 1 < len(expr) else ""
+                if next_ch in ('"', "'", "\\"):
+                    result.append(ch)
+                else:
+                    result.append("\\\\")
+                i += 1
+                continue
+            if ch == in_quote:
+                in_quote = None
+        elif ch in ('"', "'"):
+            in_quote = ch
+
+        result.append(ch)
+        i += 1
+
+    return "".join(result)
+
+
 def split_args(args_str: str) -> List[str]:
     """Separa argumentos de função respeitando aspas e parênteses aninhados."""
     args: List[str] = []
@@ -83,7 +112,7 @@ def split_concat(expr: str) -> List[str]:
 
 def eval_condition(cond: str, captures: list, variables: dict, settings, rng) -> bool:
     """Avalia condição Lua, retornando True ou False."""
-    expr = resolve_vars(cond, captures)
+    expr = resolve_vars(cond, captures, escape_for_eval=True)
     expr = expr.strip()
     if expr.startswith("(") and expr.endswith(")"):
         expr = expr[1:-1].strip()
@@ -95,6 +124,7 @@ def eval_condition(cond: str, captures: list, variables: dict, settings, rng) ->
     expr = expr.replace("string.len", "str_len")
     expr = expr.replace("tonumber", "to_number")
     expr = expr.replace("math.random", "rand")
+    expr = _escape_backslashes_in_literals(expr)
 
     safe_env = {
         "lua_match": lua_match,
@@ -115,7 +145,7 @@ def eval_condition(cond: str, captures: list, variables: dict, settings, rng) ->
 
 def eval_value(expr: str, captures: list, variables: dict, settings, rng) -> Any:
     """Avalia expressão Lua, retornando o valor resultante."""
-    expr = resolve_vars(expr.strip(), captures)
+    expr = resolve_vars(expr.strip(), captures, escape_for_eval=True)
 
     if ".." in expr:
         parts = split_concat(expr)

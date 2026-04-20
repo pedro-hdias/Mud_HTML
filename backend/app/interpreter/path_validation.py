@@ -30,6 +30,14 @@ SYSTEM_PSEUDO_CHANNELS = {
     "admin",
 }
 
+# Ações sociais que não têm arquivo dedicado no pacote, mas precisam soar naturais.
+SOCIAL_SOUND_ALIASES = {
+    "grin": "Socials/Chuckle.ogg",
+    "grinning": "Socials/Chuckle.ogg",
+    "smile": "Socials/Chuckle.ogg",
+    "nod": "Socials/Bop.ogg",
+}
+
 
 def is_valid_sound_path(path) -> bool:
     """
@@ -111,17 +119,37 @@ def is_valid_channel_sound(path) -> bool:
     return True
 
 
-def get_fallback_sound(channel: str, get_normalized_fn: Callable) -> Optional[str]:
+def get_fallback_sound(
+    channel: str,
+    get_normalized_fn: Callable,
+    requested_path: Optional[str] = None,
+) -> Optional[str]:
     """
-    Retorna path de fallback sound baseado no canal.
+    Retorna path de fallback sound baseado no canal e na categoria original.
 
     Args:
         channel: Canal de áudio (global, combat, etc)
         get_normalized_fn: Função para normalizar o caminho do som
+        requested_path: Caminho originalmente solicitado, quando disponível
 
     Returns:
         Path normalizado do fallback ou None
     """
+    normalized_request = (requested_path or "").replace("\\", "/")
+    if normalized_request.lower().startswith("socials/"):
+        social_name = Path(normalized_request).stem.lower()
+        for social_candidate in (SOCIAL_SOUND_ALIASES.get(social_name), "Socials/Say.ogg"):
+            if not social_candidate:
+                continue
+            social_fallback = get_normalized_fn(social_candidate)
+            if social_fallback:
+                logger.info(
+                    "[PlaySound] ↪ Fallback social: '%s' -> '%s'",
+                    requested_path,
+                    social_fallback,
+                )
+                return social_fallback
+
     fallback_map = {
         "global": "General/Misc/Beep2.ogg",
         "combat": "General/Devices/ButtonPush.ogg",

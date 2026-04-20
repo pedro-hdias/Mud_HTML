@@ -111,8 +111,8 @@ class SendInterpreter:
     def _is_valid_channel_sound(self, path) -> bool:
         return is_valid_channel_sound(path)
 
-    def _get_fallback_sound(self, channel: str) -> Optional[str]:
-        return get_fallback_sound(channel, self._get_normalized_sound_path)
+    def _get_fallback_sound(self, channel: str, requested_path: Optional[str] = None) -> Optional[str]:
+        return get_fallback_sound(channel, self._get_normalized_sound_path, requested_path)
 
     def _sound_file_exists(self, path: Optional[str]) -> bool:
         return sound_file_exists(path)
@@ -301,7 +301,7 @@ class SendInterpreter:
                         logger.warning(f"[PlaySound]   - {sim}")
 
                 # 🎵 FALLBACK: Tocar som padrão se disponível
-                fallback = self._get_fallback_sound(channel)
+                fallback = self._get_fallback_sound(channel, path)
                 if fallback:
                     logger.debug(f"[PlaySound] 🔄 Usando fallback: {fallback}")
                     self._emit_sound_event(fallback, channel, None, delay_ms, "fallback")

@@ -171,6 +171,16 @@ class TestConditionEvaluation:
         result = interp._eval_condition("settings.Volume == 5")
         assert result is False
 
+    def test_condicao_com_aspas_na_captura_nao_quebra_avaliacao(self):
+        """Capturas com aspas duplas não devem invalidar a sintaxe da expressão."""
+        interp = _make_interpreter(
+            captures=["linha", "OOC", 'A pre-recorded message says, "teste"'],
+        )
+        result = interp._eval_condition(
+            'string.match("%1", "OOC") and string.match("%2", "A pre\\-recorded message")'
+        )
+        assert result is True
+
 
 # ──────────────────────────────────────────────
 # 6.2.3 – Estruturas de controle
@@ -327,6 +337,27 @@ class TestSupportedFunctions:
         # Sem arquivo e sem fallback, nenhum evento de play deve ser emitido
         play_events = [e for e in interp._events if e.get("action") == "play"]
         assert len(play_events) == 0
+
+    @patch("app.interpreter.get_registry")
+    def test_social_sem_arquivo_especifico_usa_fallback_da_categoria(self, mock_get_registry):
+        """Sociais conhecidas sem arquivo direto devem usar um alias mais natural da categoria."""
+        reg = _mock_registry(get_return=None, resolve_return=None)
+
+        def _registry_get(path):
+            if path in {"Socials/Chuckle.ogg", "Socials/Say.ogg"}:
+                return path
+            return None
+
+        reg.get.side_effect = _registry_get
+        reg.resolve_best.return_value = None
+        mock_get_registry.return_value = reg
+
+        interp = _make_interpreter(captures=["linha", "channel", "male", "grin"])
+        interp.run('PlayGlobalSound("Socials/%3.ogg")')
+
+        play_events = [e for e in interp._events if e.get("action") == "play"]
+        assert len(play_events) == 1
+        assert play_events[0]["path"] == "Socials/Chuckle.ogg"
 
 
 # ──────────────────────────────────────────────
