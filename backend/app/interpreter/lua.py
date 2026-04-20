@@ -39,15 +39,18 @@ def lua_pattern_to_regex(pattern: str) -> str:
             out += lua_class_to_regex(nxt)
             i += 2
             continue
+        if ch == "\\" and i + 1 < len(pattern):
+            out += re.escape(pattern[i + 1])
+            i += 2
+            continue
         if ch in r".^$[]()+-?*":
             out += ch if ch in ".^$[]()?*+" else re.escape(ch)
             i += 1
             continue
-        # Use raw escape to avoid Python interpreting backslashes
         escaped = re.escape(ch)
         out += escaped
         i += 1
-    
+
     return out
 
 
